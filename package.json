@@ -1,12 +1,20 @@
 {
   "name": "zhumeng-lvfa-video",
   "private": true,
-  "type": "module",
   "scripts": {
-    "stills": "node video/render.mjs stills",
-    "render": "node video/render.mjs video"
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Promo out/zhumeng-lvfa.mp4",
+    "sample": "remotion render src/index.ts Promo out/sample.mp4 --frames=0-179",
+    "still": "remotion still src/index.ts Promo"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.532",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.532"
   },
   "devDependencies": {
-    "playwright": "1.56.1"
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
   }
 }
