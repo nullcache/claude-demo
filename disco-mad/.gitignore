@@ -2,3 +2,4 @@ media/
 fonts/
 out/
 __pycache__/
+release/*_preview.mp4
