@@ -1,0 +1,12 @@
+{
+  "name": "zhumeng-lvfa-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "stills": "node video/render.mjs stills",
+    "render": "node video/render.mjs video"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

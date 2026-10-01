@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>筑梦绿发 聚力启航</title>
+<style>
+  @font-face {
+    font-family: 'TitleBlack';
+    src: url('fonts/NotoSansSC-Black-title.ttf') format('truetype');
+    font-weight: 900;
+  }
+  html, body { margin: 0; height: 100%; background: #111; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { width: 100vw; height: 56.25vw; max-height: 100vh; max-width: 177.78vh; display: block; }
+  /* keeps the font warm before the first canvas draw */
+  .font-probe { position: absolute; left: -9999px; font: 900 20px 'TitleBlack'; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<span class="font-probe">筑梦绿发，聚力启航</span>
+<script src="anim.js"></script>
+</body>
+</html>
