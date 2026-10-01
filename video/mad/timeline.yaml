@@ -1,0 +1,154 @@
+# ─────────────────────────────────────────────────────────────
+#  极乐迪斯科 音MAD —《Welcome Back, Detective》
+#  所有 at / len 单位都是"拍"（≈0.531s，112.99 BPM，体感为 56 BPM 慢板）
+#  1 小节 = 4 拍 ≈ 2.124s；全片 14 小节 = 56 拍 ≈ 29.7s
+#  调性：B 小调；循环 Bm | Bsus | D | Em（原曲小节号 mod 4 = 0,1,2,3）
+# ─────────────────────────────────────────────────────────────
+meta:
+  name: v1
+  fps: 30
+  size: [1920, 1080]
+  letterbox: 2.39        # 电影宽银幕黑边
+  beats: 58              # ≈30.8s
+
+grade:
+  saturation: 0.72
+  contrast: 1.06
+  grain: 7
+  vignette: 0.6
+
+# ── 音乐：Whirling-In-Rags, 8 AM（British Sea Power）按原曲小节号拼接 ──
+music:
+  src: ost/whirling_8am.wav
+  grid: {t0: 0.46123, beat: 0.530979}     # analyze 得到的拍点网格
+  beats_per_bar: 4
+  gain_db: 0
+  duck_db: -6                              # 念白时音乐让位
+  bars:
+    # A 宿醉（安静）
+    - 12
+    - 13
+    - 14
+    - 15
+    # B 内心的声音（渐起，人声开始"唱"）
+    - 16
+    - 17
+    - 18
+    - 19
+    # C 欢迎回来（最饱满的一段）
+    - 64
+    - 65
+    - 66
+    - 67
+    # D 坠落：第 48 拍音乐抽空，只剩原曲开头的钢琴远远地回响
+    - 0
+    - 1
+    - 2
+  automation:              # [拍, dB]
+    - [0, -30]
+    - [3, -4]
+    - [47.8, 0]
+    - [48.0, -60]
+    - [49.0, -60]
+    - [51.0, -9]
+    - [56.0, -12]
+  fade_out_beats: 2
+
+# ── 人声采样（来源时间已用 samples.py refine 吸附到起音/收尾）──
+samples:
+  late:      {src: skills/electrochemistry.m4a, start: 696.48, end: 700.50}   # By the time you arrived in this world, it was already late.
+  wine:      {src: skills/electrochemistry.m4a, start: 649.76, end: 650.28}
+  alcohol1:  {src: skills/electrochemistry.m4a, start: 650.43, end: 651.00}
+  beer:      {src: skills/electrochemistry.m4a, start: 651.52, end: 651.92}
+  alcohol2:  {src: skills/electrochemistry.m4a, start: 652.22, end: 652.80}
+  love:      {src: skills/electrochemistry.m4a, start: 653.30, end: 653.85}
+  alcohol3:  {src: skills/electrochemistry.m4a, start: 654.31, end: 654.99}
+  hey_now:   {src: skills/electrochemistry.m4a, start: 278.01, end: 279.21}
+  hey1:      {src: skills/electrochemistry.m4a, start: 279.36, end: 279.71}
+  hey2:      {src: skills/electrochemistry.m4a, start: 280.08, end: 280.49}
+  hey3:      {src: skills/electrochemistry.m4a, start: 281.03, end: 281.55}
+  been_here: {src: skills/electrochemistry.m4a, start: 989.86, end: 991.28}   # You've been here before.
+  welcome:   {src: skills/electrochemistry.m4a, start: 992.14, end: 993.83}   # Welcome back, detective.
+  home:      {src: skills/electrochemistry.m4a, start: 994.46, end: 995.66}   # You're home now.
+  hiho1:     {src: skills/electrochemistry.m4a, start: 978.16, end: 978.80}
+  hiho2:     {src: skills/electrochemistry.m4a, start: 979.20, end: 979.77}
+  void:      {src: skills/electrochemistry.m4a, start: 1174.69, end: 1178.93} # From the void we came and to the void we must return.（备用）
+  whatever:  {src: skills/shivers.m4a, start: 364.79, end: 366.19}   # Whatever you thought would happen,
+  did_not:   {src: skills/shivers.m4a, start: 366.48, end: 366.93}   # did not.
+  standing:  {src: skills/shivers.m4a, start: 367.56, end: 371.89}   # And now you're just standing there with your hands fallen to your side.
+  nothing:   {src: skills/shivers.m4a, start: 175.13, end: 177.75}   # Nothing happens. Absolutely nothing.（备用）
+
+# ── 人声事件 ──
+#  note: 用 Praat 把音高拉到该音（"唱"）；flat: 1=完全拉平, 0.5=保留一半语调
+#  len:  拉伸到多少拍；fx: reverb[:量] / hall / delay[:秒] / radio / lowpass[:Hz] / warm
+voice:
+  # A —— 念白，不唱
+  - {at: 3,  sample: late, fx: [warm, "reverb:0.3"], gain_db: 1}
+
+  # B —— 低音吟唱：酒精三连（Bm | Bsus | D | Em）
+  - {at: 16, sample: wine,     note: F#2, len: 1.5, flat: 0.85, fx: ["reverb:0.25"]}
+  - {at: 18, sample: alcohol1, note: D2,  len: 2,   flat: 0.85, fx: ["reverb:0.25"]}
+  - {at: 20, sample: beer,     note: E2,  len: 1.5, flat: 0.85, fx: ["reverb:0.25"]}
+  - {at: 22, sample: alcohol2, note: B1,  len: 2,   flat: 0.85, fx: ["reverb:0.25"]}
+  - {at: 24, sample: love,     note: A2,  len: 1.5, flat: 0.85, fx: ["reverb:0.3"]}
+  - {at: 26, sample: alcohol3, note: F#2, len: 2,   flat: 0.85, fx: ["reverb:0.3"]}
+  # Em 小节：hey 三连敲在拍上，越来越高，把情绪推进 C 段
+  - {at: 28, sample: hey1, note: E2, len: 0.75, fx: ["delay:0.265"]}
+  - {at: 29, sample: hey2, note: G2, len: 0.75, fx: ["delay:0.265"]}
+  - {at: 30, sample: hey3, note: B2, len: 1.5,  fx: ["reverb:0.4"]}
+
+  # C —— 欢迎回来（半唱半说 + 高八度叠一层做"和声"）
+  - {at: 32, sample: been_here, note: F#2, len: 3,   flat: 0.6, fx: ["reverb:0.35"]}
+  - {at: 32, sample: been_here, note: F#3, len: 3,   flat: 0.6, fx: ["reverb:0.6", "lowpass:2500"], gain_db: -12, duck: false}
+  - {at: 36, sample: welcome,   note: E2,  len: 3.5, flat: 0.6, fx: ["reverb:0.35"]}
+  - {at: 36, sample: welcome,   note: B2,  len: 3.5, flat: 0.6, fx: ["reverb:0.6", "lowpass:2500"], gain_db: -12, duck: false}
+  - {at: 40, sample: home,      note: D2,  len: 3,   flat: 0.6, fx: ["reverb:0.4"]}
+  - {at: 40, sample: home,      note: A2,  len: 3,   flat: 0.6, fx: ["reverb:0.6", "lowpass:2500"], gain_db: -12, duck: false}
+  # Em：荒诞的 "Hi ho, hi ho" —— 欢快的词用最慢最低的唱法
+  - {at: 44, sample: hiho1, note: G2, len: 0.9, fx: ["reverb:0.3"]}
+  - {at: 45, sample: hiho1, note: E2, len: 0.9, fx: ["reverb:0.4"]}
+
+  # D —— SHIVERS：音乐在 "did not." 处抽空
+  - {at: 46,   sample: whatever, fx: [warm, "reverb:0.3"], gain_db: 1}
+  - {at: 48,   sample: did_not,  fx: [warm, hall], gain_db: 2, duck: false}
+  - {at: 50,   sample: standing, fx: [warm, "reverb:0.45"], gain_db: 1, duck: false}
+
+# ── 画面：每个镜头持续到下一个镜头的 at ──
+#  src: trailer key（launch / date_announce / hardcore）或 cache 下的图片
+#  fx: push[:比例] pull flash fadein fadeout stutter[:帧数] ghost dim mono blur hflip
+shots:
+  # A 宿醉：黑场渐入，旅馆地板上的人
+  - {at: 0,  src: hardcore, in: 50.0, speed: 0.55, fx: ["fadein:2.2", "push:0.10"]}
+  - {at: 9,  src: launch, in: 30.0, speed: 0.6,  fx: ["push:0.06"]}                  # 夜里的街
+  # B 每个词一刀
+  - {at: 16, src: launch, in: 17.0, speed: 0.7, fx: ["flash:0.12", "stutter:5"]}     # 旅馆房间
+  - {at: 18, src: launch, in: 26.5, speed: 0.7, fx: [ghost]}                         # 人群
+  - {at: 20, src: launch, in: 42.0, speed: 0.7, fx: ["flash:0.12", "stutter:5"]}     # 红光
+  - {at: 22, src: launch, in: 20.5, speed: 0.7, fx: [ghost]}
+  - {at: 24, src: hardcore, in: 24.0, speed: 0.7, fx: ["flash:0.12", "stutter:5"]}
+  - {at: 26, src: launch, in: 10.2, speed: 0.7, fx: [ghost]}                         # 夜晚的旅馆外景
+  - {at: 28, src: launch, in: 44.0, speed: 1.0, fx: ["stutter:3", hflip]}
+  - {at: 29, src: launch, in: 44.0, speed: 1.0, fx: ["stutter:3"]}
+  - {at: 30, src: launch, in: 44.5, speed: 1.0, fx: ["flash:0.2", "stutter:4", hflip]}
+  # C 欢迎回来：开阔的城市，慢推
+  - {at: 32, src: launch, in: 4.0,  speed: 0.6, fx: ["flash:0.25", "push:0.08"]}     # 冰海
+  - {at: 36, src: hardcore, in: 21.5, speed: 0.6, fx: ["push:0.06"]}                 # 帆船
+  - {at: 40, src: launch, in: 0.2,  speed: 0.6, fx: ["pull:0.08"]}                   # 俯瞰马丁内斯
+  - {at: 44, src: hardcore, in: 54.0, speed: 0.5, fx: ["push:0.12"]}                 # 回到地板
+  - {at: 45, src: hardcore, in: 54.5, speed: 1.0, fx: ["stutter:4", hflip]}
+  # D 坠落：雨夜，路灯下一个人站着
+  - {at: 46, src: hardcore, in: 66.0, speed: 0.5, fx: [dim]}
+  - {at: 48, src: hardcore, in: 0.0,  speed: 1.0, fx: ["dim:1"]}                     # "did not." —— 全黑
+  - {at: 50, src: hardcore, in: 37.0, speed: 0.35, fx: ["fadein:1.0", "push:0.10", "fadeout:2.0"]}
+
+# ── 字幕：仿游戏对话框 ──
+#  attr: int(蓝) psy(紫) fys(红) mot(黄)；style: center 为居中标题卡
+text:
+  - {at: 3,  len: 9,  skill: Electrochemistry, attr: fys, en: "By the time you arrived in this world, it was already late.", zh: "你来到这个世界的时候，就已经太晚了。"}
+  - {at: 16, len: 12, skill: Electrochemistry, attr: fys, en: "Wine. Alcohol. Beer. Alcohol. Love. Alcohol.", zh: "葡萄酒。酒精。啤酒。酒精。爱。酒精。"}
+  - {at: 32, len: 4,  skill: Electrochemistry, attr: fys, en: "You've been here before.", zh: "你来过这里。"}
+  - {at: 36, len: 4,  skill: Electrochemistry, attr: fys, en: "Welcome back, detective.", zh: "欢迎回来，警探。"}
+  - {at: 40, len: 4,  skill: Electrochemistry, attr: fys, en: "You're home now.", zh: "你到家了。"}
+  - {at: 44, len: 2,  skill: Electrochemistry, attr: fys, en: "Hi ho. Hi ho.", zh: "嘿吼，嘿吼。", check: "[Trivial: Success]", fade: [100, 150]}
+  - {at: 46, len: 3.5, skill: Shivers, attr: fys, en: "Whatever you thought would happen, did not.", zh: "你以为会发生的事，没有发生。", fade: [150, 600]}
+  - {at: 50, len: 8,  skill: Shivers, attr: fys, en: "And now you're just standing there, with your hands fallen to your side.", zh: "而现在，你只是站在那里，双手垂在身侧。", fade: [700, 900]}

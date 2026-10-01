@@ -1,0 +1,9 @@
+pyyaml
+numpy
+soundfile
+librosa
+praat-parselmouth
+pedalboard
+faster-whisper
+yt-dlp
+fonttools[woff]

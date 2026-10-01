@@ -1,3 +1,6 @@
 node_modules/
 video/out/frames/
 video/out/stills/
+video/mad/cache/
+video/mad/out/
+__pycache__/

@@ -1,0 +1,27 @@
+# 素材清单 —— 只记录"从哪来"，媒体本体由 fetch.py 下载到 cache/（不入库）
+# 所有素材版权归 ZA/UM 及 British Sea Power，仅用于个人二创。
+
+steam:
+  appid: 632470            # Disco Elysium - The Final Cut
+  trailers:                # key -> Steam 商店 movies[] 下标
+    launch: 0              # 上市预告，含旁白（"Precinct 41 sent..."）
+    date_announce: 1       # 发售日预告，大量 UI/对话框画面，带营销字幕
+    hardcore: 2            # Hardcore 预告，几乎无字幕，雨夜/旅馆地板
+  screenshots: true
+
+bilibili:
+  # 原声带 OST（av84969476，每 P 一首）
+  - {key: instrument_of_surrender, out: ost/instrument_of_surrender.wav, aid: 84969476, p: 1}
+  - {key: whirling_8am,            out: ost/whirling_8am.wav,            aid: 84969476, p: 2}
+  # 24 技能游戏内全音频（av512128671，每 P 一个技能），旁白 Lenval Brown
+  - {key: volition,         out: skills/volition.m4a,         aid: 512128671, p: 7}
+  - {key: inland_empire,    out: skills/inland_empire.m4a,    aid: 512128671, p: 8}
+  - {key: electrochemistry, out: skills/electrochemistry.m4a, aid: 512128671, p: 16}
+  - {key: shivers,          out: skills/shivers.m4a,          aid: 512128671, p: 17}
+
+fonts:
+  - {out: fonts/NotoSerifSC-Regular.otf, url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf"}
+  - {out: fonts/NotoSerifSC-Bold.otf,    url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Serif/SubsetOTF/SC/NotoSerifSC-Bold.otf"}
+  - {out: fonts/LibreBaskerville-400-normal.ttf, woff2: "https://cdn.jsdelivr.net/npm/@fontsource/libre-baskerville/files/libre-baskerville-latin-400-normal.woff2"}
+  - {out: fonts/LibreBaskerville-700-normal.ttf, woff2: "https://cdn.jsdelivr.net/npm/@fontsource/libre-baskerville/files/libre-baskerville-latin-700-normal.woff2"}
+  - {out: fonts/LibreBaskerville-400-italic.ttf, woff2: "https://cdn.jsdelivr.net/npm/@fontsource/libre-baskerville/files/libre-baskerville-latin-400-italic.woff2"}
