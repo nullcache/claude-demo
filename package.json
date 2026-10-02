@@ -5,7 +5,10 @@
     "studio": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts Promo out/zhumeng-lvfa.mp4",
     "sample": "remotion render src/index.ts Promo out/sample.mp4 --frames=0-179",
-    "still": "remotion still src/index.ts Promo"
+    "still": "remotion still src/index.ts Promo",
+    "dangan": "remotion render src/index.ts DanganPV out/dangan-pv.mp4 --crf=18",
+    "dangan:audio": "python3 scripts/dangan-audio.py",
+    "dangan:fonts": "python3 scripts/dangan-fonts.py"
   },
   "dependencies": {
     "@remotion/cli": "4.0.532",
