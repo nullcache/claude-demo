@@ -2,3 +2,6 @@ node_modules/
 out/
 public/audio/
 public/lyrics.json
+public/shibetsu/audio/
+public/shibetsu/lyrics.json
+__pycache__/

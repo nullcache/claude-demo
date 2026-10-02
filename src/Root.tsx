@@ -4,9 +4,12 @@ import {Promo, FPS, DURATION_S} from './Promo';
 import {StyleTest} from './StyleTest';
 import {MV, MV_FRAMES} from './mv/MV';
 import {FPS as MV_FPS} from './mv/config';
+import {Shibetsu, SHIBETSU_FRAMES} from './shibetsu/Shibetsu';
+import {FPS as SB_FPS, H as SB_H, W as SB_W} from './shibetsu/timeline';
 
 export const Root: React.FC = () => (
   <>
+    <Composition id="Shibetsu" component={Shibetsu} durationInFrames={SHIBETSU_FRAMES} fps={SB_FPS} width={SB_W} height={SB_H} />
     <Composition id="Dystopia" component={MV} durationInFrames={MV_FRAMES(MV_FPS)} fps={MV_FPS} width={1920} height={1080} />
     <Composition id="Promo" component={Promo} durationInFrames={FPS * DURATION_S} fps={FPS} width={1920} height={1080} />
     <Composition id="StyleA" component={StyleTest} defaultProps={{style: 'A' as const}} durationInFrames={132} fps={60} width={1920} height={1080} />
