@@ -9,3 +9,6 @@
 `img/` 里的图由 `scripts/shibetsu/prep.py` 处理生成：抠图（rembg isnet-general-use）、
 去除物体补背景（LaMa，[Carve/LaMa-ONNX](https://huggingface.co/Carve/LaMa-ONNX)，Apache-2.0）、
 超分（Real-ESRGAN realesr-general-x4v3，BSD-3-Clause）、复制/镜像合成成两只。
+
+字体：Shippori Mincho B1（日文）、Noto Serif SC（中文），均为 SIL Open Font License。
+片尾画面里只署音乐信息；奶娃素材的出处请写在投稿简介里。

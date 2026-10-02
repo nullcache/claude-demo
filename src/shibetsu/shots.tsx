@@ -1,6 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, Img, random} from 'remotion';
-import {Canvas, clamp, dust, easeInOut, fireflies, glints, glowDot, img, kbTransform, Layer, lerp, loadImage, Plate, prog, ss, useAsset} from './fx';
+import {Canvas, clamp, dust, easeInOut, fireflies, glowDot, img, kbTransform, Layer, lerp, loadImage, Plate, prog, ss, useAsset} from './fx';
+import {JA_FONT} from './fonts';
 import {H, Shot, W} from './timeline';
 
 export interface LayerInfo {
@@ -41,7 +42,6 @@ export const S01: React.FC<P> = ({t, shot, m}) => {
   return (
     <AbsoluteFill style={kbTransform({s: [1.0, 1.06], x: [0, 12], ox: 0.45, oy: 0.55}, p)}>
       <Plate src={m.s01.bg} filter="saturate(0.9) contrast(1.03)" />
-      <Canvas deps={[t]} draw={ctx => glints(ctx, t, 30, 'sea', [0, 1060, W, 1620], 0.75)} />
       <Layer l={a} t={t} breathe={0.005} filter="saturate(0.92)" />
     </AbsoluteFill>
   );
@@ -56,7 +56,6 @@ export const S01b: React.FC<P> = ({t, shot, m}) => {
       <AbsoluteFill style={{transform: `translateY(${bob.toFixed(2)}px) rotate(${(Math.sin(t * 1.3) * 0.35).toFixed(3)}deg)`}}>
         <Plate src={m.s01b.bg} filter="saturate(0.88) contrast(1.02) brightness(1.03)" bloom={0.24} />
       </AbsoluteFill>
-      <Canvas deps={[t]} draw={ctx => glints(ctx, t, 46, 'sea2', [160, 400, 1040, 980], 0.9)} />
     </AbsoluteFill>
   );
 };
@@ -126,7 +125,7 @@ export const S04: React.FC<P> = ({t, shot, m}) => {
             const span = H + len;
             const y = ((r('y') * span + speed * (t - shot.from)) % span) - len;
             const a = (0.10 + 0.22 * r('a')) * ss(0, 0.12, p);
-            ctx.font = `600 ${size.toFixed(0)}px "Klee One"`;
+            ctx.font = `700 ${size.toFixed(0)}px ${JA_FONT}`;
             ctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
             const chars = [...word];
             chars.forEach((ch, k) => {
@@ -452,7 +451,6 @@ export const S12: React.FC<P> = ({t, shot, m}) => {
   return (
     <AbsoluteFill style={kbTransform({s: [1.0, 1.08], oy: 0.38}, p)}>
       <Plate src={m.s12.bg} filter="saturate(1.02) contrast(1.04)" bloom={0.28} />
-      <Canvas deps={[t]} draw={ctx => glints(ctx, t, 40, 'road', [140, 1380, 940, 1900], 0.9)} />
       {ga > 0.005 ? (
         <Layer
           l={ghost}
@@ -477,7 +475,6 @@ export const S13: React.FC<P> = ({t, shot, m}) => {
   return (
     <AbsoluteFill style={kbTransform({s: [1.0, 1.08], ox: 0.72, oy: 0.68}, p)}>
       <Plate src={m.s13.bg} filter="saturate(0.86) brightness(0.99) contrast(1.02)" bloom={0.2} />
-      <Canvas deps={[t]} draw={ctx => glints(ctx, t, 14, 'lake', [0, 1150, W, 1800], 0.45)} />
     </AbsoluteFill>
   );
 };

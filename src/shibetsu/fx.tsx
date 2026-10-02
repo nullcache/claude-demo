@@ -209,33 +209,6 @@ export function dust(ctx: Ctx, t: number, n: number, seed: string, area: [number
   ctx.globalCompositeOperation = 'source-over';
 }
 
-/** 水面/积水上的闪光：十字星芒，一闪一闪 */
-export function glints(ctx: Ctx, t: number, n: number, seed: string, area: [number, number, number, number], alpha = 1) {
-  const [x0, y0, x1, y1] = area;
-  const dot = glowDot('rgba(255,250,235,1)');
-  ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < n; i++) {
-    const r = (k: string) => random(`${seed}-${i}-${k}`);
-    const period = 1.2 + 2.5 * r('T');
-    const ph = ((t + r('ph') * period) % period) / period;
-    const life = 0.22 + 0.2 * r('L');
-    if (ph > life) continue;
-    const k = Math.sin((ph / life) * Math.PI);
-    const cycle = Math.floor((t + r('ph') * period) / period);
-    const rx = random(`${seed}-${i}-x-${cycle}`), ry = random(`${seed}-${i}-y-${cycle}`);
-    const x = lerp(x0, x1, rx), y = lerp(y0, y1, ry ** 0.8);
-    const s = (10 + 26 * r('s')) * (0.6 + 0.4 * ry);
-    ctx.globalAlpha = alpha * k;
-    ctx.drawImage(dot, x - s / 2, y - s / 2, s, s);
-    ctx.globalAlpha = alpha * k * 0.7;
-    ctx.fillStyle = 'rgba(255,252,240,0.9)';
-    ctx.fillRect(x - s * 1.2, y - 0.6, s * 2.4, 1.2);
-    ctx.fillRect(x - 0.6, y - s * 0.7, 1.2, s * 1.4);
-  }
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-}
-
 // ───────────────────────── 胶片质感 ─────────────────────────
 
 let grainTiles: HTMLCanvasElement[] | null = null;

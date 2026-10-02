@@ -1,9 +1,10 @@
-import '@fontsource/klee-one/600.css';
-import 'lxgw-wenkai-webfont/lxgwwenkai-regular.css';
+import '@fontsource/shippori-mincho-b1/700.css';
+import '@fontsource-variable/noto-serif-sc';
 import React from 'react';
 import {AbsoluteFill, Audio, getStaticFiles, interpolate, staticFile, useVideoConfig} from 'remotion';
 import {Canvas, FilmGrain, ss, useAsset, useT, Vignette, weave} from './fx';
-import {drawLyrics, zhStyle} from './lyricfx';
+import {JA_FONT, ZH_FONT} from './fonts';
+import {drawLyrics} from './lyricfx';
 import {Manifest, SHOT_COMPONENTS} from './shots';
 import {AUDIO_END, CUES, DURATION, FPS, SHOTS} from './timeline';
 
@@ -12,10 +13,8 @@ interface Lyrics {
   zh: string[];
 }
 
-const JA_FONT = '"Klee One", serif';
-const ZH_FONT = '"LXGW WenKai", serif';
 const TITLE = '死別';
-const CREDIT = ['Music / Lyrics　シャノン', 'Vocal　GUMI', '奶娃素材　Nailong-Studio/wallpaper（MIT）'];
+const CREDIT = ['Music / Lyrics　シャノン', 'Vocal　GUMI'];
 
 async function loadAll(): Promise<{m: Manifest; ly: Lyrics}> {
   const [m, ly] = await Promise.all([
@@ -25,28 +24,22 @@ async function loadAll(): Promise<{m: Manifest; ly: Lyrics}> {
       .catch(() => ({ja: [], zh: []})),
   ]);
   const ja = CUES.map(c => ly.ja[c.i] ?? '').join('') + TITLE + CREDIT.join('') + 'ミーンジーシャワカナ';
-  const zh = (ly.zh ?? []).join('') + '奶娃素材';
-  await Promise.all([document.fonts.load(`600 54px ${JA_FONT}`, ja), document.fonts.load(`400 30px ${ZH_FONT}`, zh), document.fonts.load(`600 22px ${JA_FONT}`, 'ミンジャワシカナー')]);
+  const zh = (ly.zh ?? []).join('') + '奶娃版';
+  await Promise.all([document.fonts.load(`700 60px ${JA_FONT}`, ja), document.fonts.load(`600 40px ${ZH_FONT}`, zh)]);
   await document.fonts.ready;
   return {m, ly};
 }
 
-/** 右侧竖排歌词：日文原词逐字画在 canvas 上（每句一种特效，见 lyricfx.ts），中文翻译跟着做简化版 */
+/** 右侧两列竖排歌词（日文 + 中文），逐字画在 canvas 上，每句一种特效，两列同步（见 lyricfx.ts） */
 const LyricColumn: React.FC<{t: number; ly: Lyrics}> = ({t, ly}) => {
-  const j = CUES.findIndex(c => t >= c.from && t < c.to);
-  const cue = j >= 0 ? CUES[j] : null;
-  const zh = cue ? ly.zh?.[cue.i] ?? '' : '';
-  const zs = j >= 0 ? zhStyle(j, t) : null;
+  const cue = CUES.find(c => t >= c.from && t < c.to);
   // 暗带：句子之间的空隙里也不急着消失，免得一闪一闪
   const near = CUES.some(c => t >= c.from - 0.05 && t < c.to + 0.6);
   const band = cue ? ss(cue.from, cue.from + 0.4, t) : near ? 1 : 0;
   return (
     <AbsoluteFill>
-      <AbsoluteFill style={{background: 'linear-gradient(270deg, rgba(0,0,0,0.34) 0px, rgba(0,0,0,0.2) 170px, rgba(0,0,0,0) 330px)', opacity: band}} />
-      <Canvas deps={[t]} draw={ctx => drawLyrics(ctx, t, ly.ja)} />
-      {zh && zs ? (
-        <div style={{position: 'absolute', right: 140, top: 262, writingMode: 'vertical-rl', fontFamily: ZH_FONT, fontSize: 31, letterSpacing: '0.18em', ...zs}}>{zh}</div>
-      ) : null}
+      <AbsoluteFill style={{background: 'linear-gradient(270deg, rgba(0,0,0,0.42) 0px, rgba(0,0,0,0.26) 230px, rgba(0,0,0,0) 440px)', opacity: band}} />
+      <Canvas deps={[t]} draw={ctx => drawLyrics(ctx, t, ly.ja, ly.zh ?? [])} />
     </AbsoluteFill>
   );
 };
@@ -60,14 +53,14 @@ const Title: React.FC<{t: number}> = ({t}) => {
     <AbsoluteFill>
       <AbsoluteFill style={{background: 'linear-gradient(90deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.25) 35%, rgba(0,0,0,0) 60%)', opacity: a}} />
       <div style={{position: 'absolute', left: 120, top: 640, writingMode: 'vertical-rl', opacity: a, filter: `blur(${((1 - a) * 8).toFixed(1)}px)`}}>
-        <span style={{fontFamily: JA_FONT, fontWeight: 600, fontSize: 150, letterSpacing: '0.35em', color: '#fff', textShadow: '0 0 30px rgba(0,0,0,0.6)'}}>{TITLE}</span>
+        <span style={{fontFamily: JA_FONT, fontWeight: 700, fontSize: 150, letterSpacing: '0.35em', color: '#fff', textShadow: '0 0 30px rgba(0,0,0,0.6)'}}>{TITLE}</span>
       </div>
-      <div style={{position: 'absolute', left: 300, top: 700, writingMode: 'vertical-rl', fontFamily: ZH_FONT, fontSize: 30, letterSpacing: '0.5em', color: 'rgba(255,255,255,0.82)', textShadow: '0 0 10px rgba(0,0,0,0.7)', opacity: b}}>
+      <div style={{position: 'absolute', left: 300, top: 700, writingMode: 'vertical-rl', fontFamily: ZH_FONT, fontWeight: 600, fontSize: 32, letterSpacing: '0.5em', color: 'rgba(255,255,255,0.82)', textShadow: '0 0 10px rgba(0,0,0,0.7)', opacity: b}}>
         奶娃 ver.
       </div>
       <div style={{position: 'absolute', left: 92, bottom: 150, opacity: b * 0.8}}>
         {CREDIT.map(c => (
-          <div key={c} style={{fontFamily: JA_FONT, fontWeight: 600, fontSize: 21, letterSpacing: '0.08em', color: '#fff', lineHeight: 1.9, textShadow: '0 0 8px rgba(0,0,0,0.7)'}}>
+          <div key={c} style={{fontFamily: JA_FONT, fontWeight: 700, fontSize: 24, letterSpacing: '0.1em', color: '#fff', lineHeight: 1.9, textShadow: '0 0 8px rgba(0,0,0,0.7)'}}>
             {c}
           </div>
         ))}
