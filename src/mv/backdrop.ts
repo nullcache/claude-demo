@@ -45,12 +45,13 @@ export function drawSkyTexture(ctx: Ctx, cam: Cam, s: number) {
   const img = TEX.sky;
   if (!img) return;
   const W = cam.cx * 2, H = cam.cy * 2;
-  // 城市光污染下几乎看不见，歌声之后天空“擦亮”
-  const a = lerp(0.2, 1, skyVis(s));
+  // 城市光污染下几乎看不见，歌声之后天空“擦亮”。
+  // 贴片不透明铺满（重叠处内容相同 → 无接缝），再整体压暗到目标亮度
+  const a = lerp(0.18, 0.78, skyVis(s));
   const NU = 36, NV = 18, iw = img.width, ih = img.height;
   ctx.save();
-  ctx.globalAlpha = a;
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
   for (let j = 0; j < NV; j++) {
     const v0 = j / NV, v1 = (j + 1) / NV;
     const la0 = (0.5 - v0) * Math.PI, la1 = (0.5 - v1) * Math.PI;
@@ -65,6 +66,10 @@ export function drawSkyTexture(ctx: Ctx, cam: Cam, s: number) {
       texQuad(ctx, img, u0 * iw, v0 * ih, (u1 - u0) * iw, (v1 - v0) * ih, p00, p10, p01, p11);
     }
   }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1 - a;
+  ctx.fillStyle = COL.night0;
+  ctx.fillRect(0, 0, W, H);
   ctx.restore();
 }
 

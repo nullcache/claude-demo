@@ -6,9 +6,10 @@ import {AbsoluteFill, Audio, cancelRender, continueRender, delayRender, getStati
 import {loadTextures} from './backdrop';
 import {DURATION, H, SONG_IN, W} from './config';
 import {drawFrame} from './draw';
+import {loadLyrics} from './lyrics';
 import {loadFonts} from './text';
 
-/** 把原曲放进 public/audio/song.(mp3|m4a|flac|wav|ogg) 就会自动对齐入点混进去 */
+/** 原曲在 public/audio/song.*（node scripts/fetch-source.mjs 取得）时自动按入点混进去 */
 const findSong = () => getStaticFiles().find(f => /^audio\/song\.(mp3|m4a|aac|flac|wav|ogg)$/i.test(f.name));
 
 export const MV: React.FC = () => {
@@ -21,7 +22,7 @@ export const MV: React.FC = () => {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadFonts(), loadTextures(staticFile)])
+    Promise.all([loadLyrics(staticFile('lyrics.json')).then(loadFonts), loadTextures(staticFile)])
       .then(() => setReady(true))
       .catch(e => cancelRender(e));
   }, []);
@@ -43,7 +44,7 @@ export const MV: React.FC = () => {
         <Audio
           src={song.src}
           trimBefore={Math.round(SONG_IN * fps)}
-          volume={f => interpolate(f, [0, 4, durationInFrames - Math.round(0.7 * fps), durationInFrames - 1], [0, 1, 1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})}
+          volume={f => interpolate(f, [0, 6, durationInFrames - Math.round(0.4 * fps), durationInFrames - 1], [0, 1, 1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})}
         />
       ) : null}
     </AbsoluteFill>

@@ -6,7 +6,8 @@ import {prepareCrane} from './crane';
 import {bulge, holeOpen} from './scene';
 import {grain, offscreen} from './sprites';
 import {Cam} from './v3';
-import {drawScreenText, drawWorldText} from './text';
+import {drawScreenLyrics, drawWorldLyrics} from './lyricfx';
+import {drawTitle} from './text';
 import {buildNet, drawCity, drawDust, drawKnots, drawNetSegs, drawRings, drawSky, drawStar, drawThread, prepareTrain} from './world';
 
 /** 画一帧（s = 原曲时间） */
@@ -28,7 +29,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, s: number) {
   drawKnots(ctx, cam, s);
   drawRings(ctx, cam, s);
   drawStar(ctx, cam, s);
-  drawWorldText(ctx, cam, s, bulge(s), holeOpen(s));
+  drawWorldLyrics(ctx, cam, s, bulge(s), holeOpen(s));
   drawThread(ctx, cam, s, crane.beakWorld);
   train.filter(it => it.z >= cz).sort((a, b) => b.z - a.z).forEach(it => it.draw(ctx));
   crane.draw(ctx);
@@ -37,7 +38,8 @@ export function drawFrame(ctx: CanvasRenderingContext2D, s: number) {
   drawDust(ctx, cam, s, 0.55 + 0.45 * ss(CUE.c7, CUE.post, s));
 
   post(ctx, s);
-  drawScreenText(ctx, s);
+  drawScreenLyrics(ctx, cam, s);
+  drawTitle(ctx, s);
   fades(ctx, s);
 }
 
@@ -53,8 +55,10 @@ function drawBackground(ctx: CanvasRenderingContext2D, cam: Cam, s: number) {
   ac.setTransform(1, 0, 0, 1, 0, 0);
   ac.globalAlpha = 1;
   ac.globalCompositeOperation = 'source-over';
-  drawSky(ac, half, s);
+  ac.fillStyle = '#04050d';
+  ac.fillRect(0, 0, hw, hh);
   drawSkyTexture(ac, half, s);
+  drawSky(ac, half, s, false);
   drawFarGround(ac, half);
   drawCityGlow(ac, half, s);
   drawTowers(ac, half, s);

@@ -274,10 +274,12 @@ const NEB: Array<{d: V3; size: number; c: readonly number[]; a: number}> = [];
   }
 }
 
-export function drawSky(ctx: Ctx, cam: Cam, s: number) {
+export function drawSky(ctx: Ctx, cam: Cam, s: number, fill = true) {
   const W = cam.cx * 2, H = cam.cy * 2;
-  ctx.fillStyle = COL.night0;
-  ctx.fillRect(0, 0, W, H);
+  if (fill) {
+    ctx.fillStyle = COL.night0;
+    ctx.fillRect(0, 0, W, H);
+  }
   // 地平线附近一圈极淡的雾光
   ctx.globalCompositeOperation = 'lighter';
   const hz = glow([40, 48, 110], 0);
@@ -396,12 +398,12 @@ export function drawStar(ctx: Ctx, cam: Cam, s: number) {
   const px = cam.focal / p[2];
   const breath = 1 + 0.08 * Math.sin(s * 2.1) + 0.06 * Math.sin(((s - CUE.c1) / 0.5) * Math.PI);
   ctx.globalCompositeOperation = 'lighter';
-  blit(ctx, glow(COL.singerHalo, 0), p[0], p[1], clamp(px * 22, 200, 2600) * breath, 0.16 * on + 0.3 * fl);
-  blit(ctx, glow(COL.singer, 0.4), p[0], p[1], clamp(px * 6, 60, 900) * breath, 0.5 * on + 0.5 * fl);
-  blit(ctx, glow([255, 255, 255], 1), p[0], p[1], clamp(px * 1.4, 16, 200), 0.95 * on + fl);
+  blit(ctx, glow(COL.singerHalo, 0), p[0], p[1], clamp(px * 22, 200, 1100) * breath, (0.16 * on + 0.3 * fl) * clamp(260 / (px * 22)));
+  blit(ctx, glow(COL.singer, 0.4), p[0], p[1], clamp(px * 6, 60, 420) * breath, (0.5 * on + 0.5 * fl) * clamp(0.35 + 120 / (px * 6)));
+  blit(ctx, glow([255, 255, 255], 1), p[0], p[1], clamp(px * 1.4, 16, 90), 0.95 * on + fl);
   // 慢慢转动的星芒
   const fr = flare(COL.singer);
-  const d = clamp(px * 11, 140, 1500) * (1 + 0.6 * fl) * breath;
+  const d = clamp(px * 11, 140, 640) * (1 + 0.6 * fl) * breath;
   for (const [rot, a] of [
     [s * 0.05, 0.85],
     [Math.PI / 4 - s * 0.03, 0.4],
@@ -451,13 +453,12 @@ export function drawThread(ctx: Ctx, cam: Cam, s: number, beak: V3) {
   for (let d = RAIL_TOTAL; d >= tip - 1e-6; d -= 0.5) pts.push(add(railAt(d), mul(sway(d), 1 - railK)));
   const last = threadLast(s);
   if (last > 0 && s < CUE.v1 + 0.2) {
-    // 轨道起点 → 网上的穿孔点 → 纸鹤的喙（贝塞尔）
+    // 轨道起点 → 网上的穿孔点 → 纸鹤的喙（二次贝塞尔，控制点在穿孔处）
     const a = railAt(0), b = mul(GAP_DIR, R + 0.05), c = beak;
-    const n = Math.ceil(24 * last);
+    const n = Math.ceil(32 * last);
     for (let i = 1; i <= n; i++) {
-      const u = (i / 24) * 1;
-      const q = u < 0.5 ? add(mul(a, 1 - u * 2), mul(b, u * 2)) : add(mul(b, 2 - u * 2), mul(c, u * 2 - 1));
-      pts.push(q);
+      const u = i / 32;
+      pts.push(add(add(mul(a, (1 - u) * (1 - u)), mul(b, 2 * u * (1 - u))), mul(c, u * u)));
     }
   }
   if (pts.length < 2) return;
@@ -543,8 +544,8 @@ export function prepareTrain(cam: Cam, s: number): TrainItem[] {
           pr.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
           ctx.closePath();
           ctx.fill();
-          ctx.globalAlpha = 0.55 * a;
-          ctx.strokeStyle = rgba(COL.rail, 0.7);
+          ctx.globalAlpha = 0.45 * a;
+          ctx.strokeStyle = rgba([150, 170, 230], 0.8);
           ctx.lineWidth = 1;
           ctx.stroke();
           // 车窗
@@ -554,8 +555,8 @@ export function prepareTrain(cam: Cam, s: number): TrainItem[] {
               const x0 = -0.78 + wi * 0.42, x1 = x0 + 0.3;
               const y = fc.side;
               const wq = [P(x0, y * 1.001, -0.15), P(x1, y * 1.001, -0.15), P(x1, y * 1.001, 0.55), P(x0, y * 1.001, 0.55)].map(q => project(cam, q));
-              ctx.globalAlpha = 0.95 * a;
-              ctx.fillStyle = rgba(COL.window, 0.9);
+              ctx.globalAlpha = 0.6 * a;
+              ctx.fillStyle = rgba([255, 178, 96], 0.85);
               ctx.beginPath();
               wq.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
               ctx.closePath();

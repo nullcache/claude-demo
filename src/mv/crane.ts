@@ -89,8 +89,9 @@ export function prepareCrane(cam: Cam, s: number, scale = 1): CraneDraw {
       const px = cam.focal / depth; // 每单位像素
       // 外层暖光
       ctx.globalCompositeOperation = 'lighter';
-      blit(ctx, glow(COL.paperShade, 0.2), hc[0], hc[1], px * 5.5, 0.1 * hg);
-      blit(ctx, glow(COL.heart, 0.3), hc[0], hc[1], px * (1.6 + 0.35 * hb), (0.3 + 0.35 * hb) * hg);
+      const near = clamp((depth - 0.6) / 1.4); // 贴近镜头时收住光晕，免得糊成一片白
+      blit(ctx, glow(COL.paperShade, 0.2), hc[0], hc[1], Math.min(px * 5.5, 1100), 0.1 * hg * near);
+      blit(ctx, glow(COL.heart, 0.3), hc[0], hc[1], Math.min(px * (1.6 + 0.35 * hb), 700), (0.3 + 0.35 * hb) * hg * near);
       // 纸面（画家算法）：以心为圆心的径向渐变 = 光透过纸；再按朝向压暗
       ctx.globalCompositeOperation = 'source-over';
       items.sort((a, b) => b.z - a.z);
@@ -123,7 +124,7 @@ export function prepareCrane(cam: Cam, s: number, scale = 1): CraneDraw {
       }
       // 心：透过纸透出来的跳动的光
       ctx.globalCompositeOperation = 'lighter';
-      blit(ctx, glow(COL.heart, 0.35), hc[0], hc[1], px * (0.9 + 0.45 * hb), (0.45 + 0.55 * hb) * hg);
+      blit(ctx, glow(COL.heart, 0.35), hc[0], hc[1], Math.min(px * (0.9 + 0.45 * hb), 500), (0.45 + 0.55 * hb) * hg * near);
       blit(ctx, glow([255, 214, 200], 0.9), hc[0], hc[1], px * (0.22 + 0.08 * hb), (0.6 + 0.4 * hb) * hg);
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;

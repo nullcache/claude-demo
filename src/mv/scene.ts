@@ -33,7 +33,7 @@ export const bulge = (s: number) => {
 export const holeOpen = (s: number) => E.io3(prog(s, CUE.bridge + 5.0, CUE.v1 - 1.8));
 export const HOLE_R = 3.4 * DEG;
 /** 歌声光环：从穹顶顶点向下扫，每扫过一圈纬线就点亮那一圈网结 */
-export const RINGS = [CUE.c7 - 0.1, CUE.c7 + 1.0, CUE.c8 - 0.05, CUE.c8 + 1.0];
+export const RINGS = [CUE.c7, CUE.c7 + 2 * BEAT, CUE.c8, CUE.c8 + 2 * BEAT]; // 落在拍点上
 export const RING_SPEED = 38 * DEG; // 每秒下扫的角度
 export const ringEl = (k: number, s: number) => Math.PI / 2 - (s - RINGS[k]) * RING_SPEED;
 /** 网线的亮度系数（点亮成星后网线退成星座连线） */
