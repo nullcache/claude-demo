@@ -1,7 +1,7 @@
 import {clamp, DEG, E, lerp, prog, ss, TAU} from '../lib/math';
 import {COL, H, rgba, W} from './config';
 import {LINES, Line} from './lyrics';
-import {heartbeat} from './scene';
+import {heartbeat, R} from './scene';
 import {blit, glow} from './sprites';
 import {Cam, project, rng} from './v3';
 import {netPoint} from './world';
@@ -91,16 +91,16 @@ const lastT = (l: Line) => l.times[l.times.length - 1];
 // ───────────── 各句特效 ─────────────
 const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
   whisper(ctx, l, s) {
-    const xs = rowX(l.chars.length, 70);
+    const xs = rowX(l.chars.length, 82);
     const out = leave(s, l, 0.4);
     l.chars.forEach((ch, k) => {
       const a = appear(s, l.times[k], 0.25);
-      glyph(ctx, {ch, x: xs[k], y: H * 0.8 - 18 * out, size: 40, weight: 400, a: a * (1 - out), blur: 6 * (1 - a) + 6 * out, glow: 0.6});
+      glyph(ctx, {ch, x: xs[k], y: H * 0.78 - 18 * out, size: 46, weight: 400, a: a * (1 - out), blur: 6 * (1 - a) + 6 * out, glow: 0.6});
     });
   },
 
   column(ctx, l, s) {
-    const x = W * 0.14, y0 = 230, size = 56;
+    const x = W * 0.12, y0 = 196, size = 66;
     const out = leave(s, l, 0.6);
     const hb = heartbeat(s);
     const n = l.chars.length;
@@ -132,8 +132,8 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
   },
 
   flicker(ctx, l, s) {
-    const xs = rowX(l.chars.length, 74);
-    const y = H * 0.17;
+    const xs = rowX(l.chars.length, 88);
+    const y = H * 0.2;
     const out = leave(s, l, 0.5);
     l.chars.forEach((ch, k) => {
       const tt = s - l.times[k] + 0.04;
@@ -154,18 +154,18 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.fillStyle = rgba(COL.window, 0.07 * a);
-      ctx.fillRect(xs[k] - 30, y - 34, 60, 68);
+      ctx.fillRect(xs[k] - 36, y - 41, 72, 82);
       ctx.strokeStyle = rgba(COL.window, 0.22 * a);
       ctx.lineWidth = 1;
-      ctx.strokeRect(xs[k] - 30, y - 34, 60, 68);
+      ctx.strokeRect(xs[k] - 36, y - 41, 72, 82);
       ctx.restore();
-      glyph(ctx, {ch, x: xs[k], y, size: 50, a, col: [255, 226, 186], glow: 0.7 * on, glowCol: COL.window, blur: out * 5});
+      glyph(ctx, {ch, x: xs[k], y, size: 60, weight: 400, a, col: [255, 226, 186], glow: 0.7 * on, glowCol: COL.window, blur: out * 5});
     });
   },
 
   burn(ctx, l, s) {
-    const xs = rowX(l.chars.length, 80);
-    const y = H * 0.24;
+    const xs = rowX(l.chars.length, 98);
+    const y = H * 0.26;
     const out = leave(s, l, 0.7);
     l.chars.forEach((ch, k) => {
       const t = l.times[k];
@@ -177,7 +177,7 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
       const jit = hot ? 2.2 * Math.sin(s * 47 + k) : 0;
       const col = [255, lerp(255, 206, clamp(u * 2)), lerp(255, 168, clamp(u * 2))];
       glyph(ctx, {
-        ch, x: xs[k] + jit, y: y + jit * 0.5 - out * 20, size: 60, weight: 400, a: (1 - out) * clamp(u * 12),
+        ch, x: xs[k] + jit, y: y + jit * 0.5 - out * 20, size: 74, weight: 500, a: (1 - out) * clamp(u * 12),
         col: out > 0 ? [lerp(col[0], 160, out), lerp(col[1], 60, out), lerp(col[2], 40, out)] : col,
         glow: 0.5 + 2.2 * flash, glowCol: [255, 200, 150], ca: 1.2 + 7 * flash + (hot ? 1.5 : 0), blur: 3 * flash + 6 * out,
       });
@@ -194,8 +194,8 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
 
   drift(ctx, l, s) {
     const n = l.chars.length;
-    const xs = rowX(n, 70);
-    const y = H * 0.8;
+    const xs = rowX(n, 84);
+    const y = H * 0.78;
     const out = leave(s, l, 0.8);
     // 雾
     ctx.save();
@@ -212,14 +212,14 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
       const x = lerp(sx, xs[k] + (r() - 0.5) * 26, g) + wob * (1 - g * 0.6) + (r() - 0.5) * 160 * out;
       const yy = lerp(sy, y + (r() - 0.5) * 30, g) + 8 * Math.sin(s * 0.9 + k) - 30 * out;
       const a = ss(t - 0.7, t, s) * (0.4 + 0.6 * g) * (1 - out);
-      glyph(ctx, {ch, x, y: yy, size: 52, a, col: [214, 218, 236], blur: lerp(9, lost ? 3.2 : 0.8, g) + 6 * out, glow: 0.25});
+      glyph(ctx, {ch, x, y: yy, size: 62, a, col: [214, 218, 236], blur: lerp(9, lost ? 3.2 : 0.8, g) + 6 * out, glow: 0.25});
     });
   },
 
   glint(ctx, l, s) {
     const n = l.chars.length;
-    const xs = rowX(n, 72);
-    const y = H * 0.82;
+    const xs = rowX(n, 86);
+    const y = H * 0.78;
     const out = leave(s, l, 0.6);
     const t0 = l.times[0], t1 = lastT(l);
     // 冷光的位置：按每个字的时刻插值
@@ -233,7 +233,7 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
     l.chars.forEach((ch, k) => {
       const a = ss(l.times[k] - 0.06, l.times[k] + 0.08, s) * (1 - out);
       const col = [lerp(208, 255, warmK), lerp(224, 226, warmK), lerp(255, 196, warmK)];
-      glyph(ctx, {ch, x: xs[k], y, size: 52, a, col, glow: 0.3 + 0.4 * warmK, glowCol: col});
+      glyph(ctx, {ch, x: xs[k], y, size: 62, weight: 400, a, col, glow: 0.3 + 0.4 * warmK, glowCol: col});
     });
     // 刀锋一样的冷光 → 化成暖色的光点落下
     const lineA = ss(t0 - 0.3, t0, s) * (1 - warmK);
@@ -263,18 +263,18 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
 
   wave(ctx, l, s) {
     const emph = l.emph ? l.text.indexOf(l.emph) : -1;
-    const sizes = l.chars.map((_, i) => (emph >= 0 && i >= emph && i < emph + l.emph!.length ? 78 : 54));
+    const sizes = l.chars.map((_, i) => (emph >= 0 && i >= emph && i < emph + l.emph!.length ? 96 : 62));
     const adv = sizes.map(z => z * 1.45);
     let x = W / 2 - (adv.reduce((a, b) => a + b, 0) - adv[0] / 2 - adv[adv.length - 1] / 2) / 2;
-    const y = H * 0.8;
+    const y = H * 0.78;
     const out = leave(s, l, 0.6);
     l.chars.forEach((ch, k) => {
-      const big = sizes[k] > 60;
+      const big = sizes[k] > 70;
       const t = l.times[k];
       const a = appear(s, t, 0.3);
       const r = rng(600 + k + l.idx * 20);
       glyph(ctx, {
-        ch, x: x + (r() - 0.5) * 40 * out, y: y - (big ? 6 : 0) - 10 * (1 - a) - 26 * out, size: sizes[k], weight: big ? 400 : 300,
+        ch, x: x + (r() - 0.5) * 40 * out, y: y - (big ? 8 : 0) - 10 * (1 - a) - 26 * out, size: sizes[k], weight: big ? 600 : 400,
         a: a * (1 - out), blur: 7 * (1 - a) + 6 * out, col: big ? [255, 226, 196] : INK, glow: big ? 0.9 : 0.4, glowCol: big ? [255, 210, 170] : COL.ring,
       });
       // 每个字落下时漾开一圈
@@ -299,8 +299,8 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
     // 竖排两列，从右往左；字像珠子一样沿着细线滑下来
     const n = l.chars.length;
     const split = Math.min(n, Math.max(1, l.chars.indexOf('这') + 1 || Math.ceil(n / 2)));
-    const cols = [W - 170, W - 280];
-    const size = 46, gap = size * 1.22, y0 = 170;
+    const cols = [W - 180, W - 300];
+    const size = 54, gap = size * 1.22, y0 = 170;
     const out = leave(s, l, 0.8);
     const vis = ss(l.t - 0.4, l.t, s) * (1 - out);
     ctx.save();
@@ -328,8 +328,8 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
   },
 
   break(ctx, l, s) {
-    const xs = rowX(l.chars.length, 84);
-    const y = H * 0.2;
+    const xs = rowX(l.chars.length, 98);
+    const y = H * 0.24;
     const out = leave(s, l, 0.6);
     l.chars.forEach((ch, k) => {
       const t = l.times[k];
@@ -340,7 +340,7 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
       const jx = 3 * struggle * Math.sin(s * 61 + k * 3), jy = 2 * struggle * Math.cos(s * 53 + k);
       const free = E.o3(prog(s, tb, tb + 0.6));
       // 方框：四条边各自飞散
-      const hs = 34;
+      const hs = 40;
       const r = rng(800 + k);
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -367,15 +367,15 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
         void i;
       });
       ctx.restore();
-      glyph(ctx, {ch, x: xs[k] + jx, y: y + jy - 14 * free - 20 * out, size: 50, a: a * (1 - out), col: free > 0.2 ? WARM : INK, glow: 0.2 + 0.6 * free * (1 - free * 0.5), glowCol: WARM, blur: 5 * out});
+      glyph(ctx, {ch, x: xs[k] + jx, y: y + jy - 14 * free - 20 * out, size: 60, weight: 400, a: a * (1 - out), col: free > 0.2 ? WARM : INK, glow: 0.2 + 0.6 * free * (1 - free * 0.5), glowCol: WARM, blur: 5 * out});
       if (free > 0) sparks(ctx, 850 + k, xs[k], y, 6, free, WARM, 70, 30, 5);
     });
   },
 
   stamp(ctx, l, s) {
     const n = l.chars.length;
-    const xs = rowX(n, 76);
-    const y = H * 0.8;
+    const xs = rowX(n, 92);
+    const y = H * 0.76;
     const out = leave(s, l, 0.7);
     let shake = 0;
     l.chars.forEach((_, k) => {
@@ -389,7 +389,7 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
       const r = rng(900 + k);
       const sc = lerp(1.7, 1, E.i3(u));
       glyph(ctx, {
-        ch, x: xs[k], y: y + shake, size: 54, weight: 600, a: u * (1 - out), col: [214, 208, 200], rot: (r() - 0.5) * 0.08,
+        ch, x: xs[k], y: y + shake, size: 66, weight: 700, a: u * (1 - out), col: [214, 208, 200], rot: (r() - 0.5) * 0.08,
         sx: sc, sy: sc, blur: 3 * (1 - u) + 7 * out, shadow: 1.4,
       });
       // 落下时的一圈尘
@@ -406,17 +406,17 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
       ctx.scale(sc, sc);
       ctx.strokeStyle = rgba(COL.cell, 0.8 * sealA);
       ctx.lineWidth = 3;
-      const hw = ((n - 1) * 76) / 2 + 52;
-      ctx.strokeRect(-hw, -46, hw * 2, 92);
+      const hw = ((n - 1) * 92) / 2 + 60;
+      ctx.strokeRect(-hw, -54, hw * 2, 108);
       ctx.restore();
     }
   },
 
   flap(ctx, l, s) {
     const n = l.chars.length;
-    const cw = 66, chh = 84, gap = 8;
+    const cw = 78, chh = 98, gap = 9;
     const x0 = W / 2 - ((n - 1) * (cw + gap)) / 2;
-    const y = H * 0.15;
+    const y = H * 0.22;
     const out = leave(s, l, 0.5);
     const board = ss(l.t - 0.5, l.t - 0.2, s) * (1 - out);
     if (board <= 0) return;
@@ -446,12 +446,12 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
       const shown = settle ? ch : flipping ? pool[Math.abs((step * 7 + k * 13) % pool.length)] : '';
       const ph = settle ? 1 : ((s - l.t) / 0.05) % 1;
       if (!shown) return;
-      glyph(ctx, {ch: shown, x, y, size: 52, weight: 500, a: board * (settle ? 1 : 0.75), col: settle ? [255, 200, 110] : [200, 160, 100], sy: settle ? 1 : Math.abs(Math.cos(ph * Math.PI)), glow: settle ? 0.45 : 0.1, glowCol: COL.rail, shadow: 0});
+      glyph(ctx, {ch: shown, x, y, size: 62, weight: 600, a: board * (settle ? 1 : 0.75), col: settle ? [255, 200, 110] : [200, 160, 100], sy: settle ? 1 : Math.abs(Math.cos(ph * Math.PI)), glow: settle ? 0.45 : 0.1, glowCol: COL.rail, shadow: 0});
     });
   },
 
   sink(ctx, l, s) {
-    const x = W - 200, y0 = 260, size = 52;
+    const x = W - 210, y0 = 230, size = 62;
     const sinkT = lastT(l) + 0.25;
     l.chars.forEach((ch, k) => {
       const t = l.times[k];
@@ -467,21 +467,21 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
   },
 
   rise(ctx, l, s) {
-    const xs = rowX(l.chars.length, 74);
-    const y = H * 0.8;
+    const xs = rowX(l.chars.length, 90);
+    const y = H * 0.76;
     const out = leave(s, l, 0.5);
     l.chars.forEach((ch, k) => {
       const t = l.times[k];
       const u = prog(s, t - 0.08, t + 0.35);
       if (u <= 0) return;
       const yy = y + 70 * (1 - E.oBack(u, 2.2)) - 24 * out;
-      glyph(ctx, {ch, x: xs[k], y: yy, size: 54, weight: 400, a: clamp(u * 3) * (1 - out), col: WARM, glow: 0.6, glowCol: [255, 196, 150], blur: 5 * out});
+      glyph(ctx, {ch, x: xs[k], y: yy, size: 66, weight: 500, a: clamp(u * 3) * (1 - out), col: WARM, glow: 0.6, glowCol: [255, 196, 150], blur: 5 * out});
       sparks(ctx, 1100 + k, xs[k], y - 20, 6, prog(s, t, t + 0.7), [255, 214, 170], 40, 120, 6);
     });
   },
 
   echo(ctx, l, s) {
-    const xs = rowX(l.chars.length, 76);
+    const xs = rowX(l.chars.length, 92);
     const y = H * 0.5;
     const out = leave(s, l, 0.5);
     l.chars.forEach((ch, k) => {
@@ -492,18 +492,18 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
       for (let e = 1; e <= 3; e++) {
         const u = prog(s, t + e * 0.07, t + e * 0.07 + 0.8);
         if (u <= 0 || u >= 1) continue;
-        glyph(ctx, {ch, x: xs[k], y, size: 54, a: 0.35 * (1 - u) * (1 - out), col: [190, 180, 255], sx: 1 + 0.9 * u, sy: 1 + 0.9 * u, blur: 2 + 4 * u, shadow: 0});
+        glyph(ctx, {ch, x: xs[k], y, size: 66, a: 0.35 * (1 - u) * (1 - out), col: [190, 180, 255], sx: 1 + 0.9 * u, sy: 1 + 0.9 * u, blur: 2 + 4 * u, shadow: 0});
       }
-      glyph(ctx, {ch, x: xs[k], y: y - 20 * out, size: 54, a: a * (1 - out), col: INK, glow: 0.35, glowCol: COL.ring, blur: 5 * out});
+      glyph(ctx, {ch, x: xs[k], y: y - 20 * out, size: 66, weight: 400, a: a * (1 - out), col: INK, glow: 0.35, glowCol: COL.ring, blur: 5 * out});
     });
   },
 
   reach(ctx, l, s) {
     const n = l.chars.length;
     const stretch = ss(lastT(l), l.end + 0.2, s); // 句尾：整行往右拉长、追出去
-    const gap = lerp(80, 128, stretch);
+    const gap = lerp(96, 150, stretch);
     const xs = rowX(n, gap, W / 2 + 160 * stretch);
-    const y = H * 0.8;
+    const y = H * 0.76;
     const out = leave(s, l, 0.5);
     l.chars.forEach((ch, k) => {
       const t = l.times[k];
@@ -511,21 +511,21 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
       if (a <= 0) return;
       // 向右的拖影
       for (let e = 1; e <= 5; e++) {
-        glyph(ctx, {ch, x: xs[k] + e * (10 + 30 * stretch), y, size: 56, a: (0.22 / e) * a * (1 - out), col: [255, 214, 180], blur: 2 + e, shadow: 0, sx: 1 + 0.15 * e * stretch});
+        glyph(ctx, {ch, x: xs[k] + e * (10 + 30 * stretch), y, size: 68, a: (0.22 / e) * a * (1 - out), col: [255, 214, 180], blur: 2 + e, shadow: 0, sx: 1 + 0.15 * e * stretch});
       }
-      glyph(ctx, {ch, x: xs[k] + 40 * out, y, size: 56, weight: 400, a: a * (1 - out), col: WARM, glow: 0.5, glowCol: COL.rail, blur: 4 * out});
+      glyph(ctx, {ch, x: xs[k] + 40 * out, y, size: 68, weight: 500, a: a * (1 - out), col: WARM, glow: 0.5, glowCol: COL.rail, blur: 4 * out});
     });
   },
 
   farewell(ctx, l, s) {
-    const xs = rowX(l.chars.length, 104);
+    const xs = rowX(l.chars.length, 128);
     const y = H * 0.48;
     const dis = prog(s, lastT(l) + 0.15, l.end - 0.1); // 化成星尘飞向右上方的那颗星
     l.chars.forEach((ch, k) => {
       const t = l.times[k];
       const a = appear(s, t, 0.4);
       if (a <= 0) return;
-      glyph(ctx, {ch, x: xs[k], y, size: 72, a: a * (1 - E.i2(dis)), col: WARM, glow: 0.6, glowCol: [255, 210, 180], blur: 5 * (1 - a) + 8 * dis});
+      glyph(ctx, {ch, x: xs[k], y, size: 92, weight: 400, a: a * (1 - E.i2(dis)), col: WARM, glow: 0.6, glowCol: [255, 210, 180], blur: 5 * (1 - a) + 8 * dis});
       if (dis > 0) {
         const r = rng(1300 + k);
         ctx.save();
@@ -544,6 +544,7 @@ const FX: Record<string, (ctx: Ctx, l: Line, s: number, cam: Cam) => void> = {
 
 /** 一个字困在一格网里：写在世界空间的网格上 */
 function netText(ctx: Ctx, cam: Cam, l: Line, s: number, bul: number, hole: number) {
+  if (Math.hypot(...cam.pos) > R) return; // 从笼外看是反字，不画
   const AZ = 2.5 * DEG, EL = 2 * DEG;
   const el0 = 18 * DEG, el1 = el0 + EL;
   const fadeOut = ss(l.end + 0.1, l.end + 0.8, s);
@@ -589,22 +590,22 @@ export function drawWorldLyrics(ctx: Ctx, cam: Cam, s: number, bul: number, hole
 
 /** 各特效的字幕区域：在下面垫一层很淡的暗雾，保证压在亮网/亮星上也看得清 */
 const ZONE: Partial<Record<string, [number, number, number, number]>> = {
-  whisper: [W / 2, H * 0.8, 520, 120],
-  flicker: [W / 2, H * 0.17, 1000, 150],
-  burn: [W / 2, H * 0.24, 1000, 160],
-  drift: [W / 2, H * 0.8, 1000, 150],
-  glint: [W / 2, H * 0.82, 1000, 150],
-  wave: [W / 2, H * 0.8, 1100, 170],
-  break: [W / 2, H * 0.2, 1000, 160],
-  stamp: [W / 2, H * 0.8, 900, 160],
-  flap: [W / 2, H * 0.15, 900, 160],
-  sink: [W - 200, H * 0.5, 180, 700],
-  rise: [W / 2, H * 0.8, 900, 160],
-  echo: [W / 2, H * 0.5, 900, 160],
-  reach: [W / 2 + 120, H * 0.8, 1100, 160],
-  farewell: [W / 2, H * 0.48, 900, 200],
-  column: [W * 0.14, H * 0.5, 180, 800],
-  thread: [W - 225, H * 0.4, 300, 700],
+  whisper: [W / 2, H * 0.78, 560, 130],
+  flicker: [W / 2, H * 0.2, 1200, 170],
+  burn: [W / 2, H * 0.26, 1250, 190],
+  drift: [W / 2, H * 0.78, 1150, 170],
+  glint: [W / 2, H * 0.78, 1150, 170],
+  wave: [W / 2, H * 0.78, 1300, 190],
+  break: [W / 2, H * 0.24, 1150, 180],
+  stamp: [W / 2, H * 0.76, 1100, 190],
+  flap: [W / 2, H * 0.22, 1000, 180],
+  sink: [W - 210, H * 0.5, 200, 760],
+  rise: [W / 2, H * 0.76, 1050, 180],
+  echo: [W / 2, H * 0.5, 1050, 180],
+  reach: [W / 2 + 120, H * 0.76, 1250, 180],
+  farewell: [W / 2, H * 0.48, 1100, 230],
+  column: [W * 0.12, H * 0.5, 210, 820],
+  thread: [W - 240, H * 0.42, 330, 760],
 };
 function shade(ctx: Ctx, z: [number, number, number, number], a: number) {
   if (a <= 0.01) return;

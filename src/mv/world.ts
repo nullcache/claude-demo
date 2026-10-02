@@ -14,8 +14,10 @@ type Ctx = CanvasRenderingContext2D;
 const AZ_STEP = 2.5 * DEG, EL_STEP = 2 * DEG;
 const NM = 144, NP = 44; // 经线 144 根、纬线 0..86°
 const lvOf = (i: number) => (i % 4 === 0 ? 0 : i % 2 === 0 ? 1 : 2);
-const MER_TOP = [86, 76, 62].map(x => x * DEG); // 细的经线不升到顶，避免顶点过密
+const MER_TOP = [89, 76, 62].map(x => x * DEG); // 细的经线不升到顶，避免顶点过密；粗的封住顶口
 const SPACING = [4, 2, 1]; // 各层的近似网格边长（世界单位）
+const SAG = 0.12 * DEG; // 纬线下垂
+const THICK = 0.008; // 丝线的世界粗细
 
 interface Line {
   lv: number;
@@ -33,7 +35,7 @@ for (let i = 0; i < NM; i++) {
 for (let j = 0; j < NP; j++) {
   const lv = lvOf(j), el = j * EL_STEP;
   const pts: Array<[number, number]> = [];
-  for (let a = 0; a <= 360; a += 1) pts.push([a * DEG, el]);
+  for (let a = 0; a <= 360; a += 0.5) pts.push([a * DEG, el]);
   LINES.push({lv, pts, isPar: true, j});
 }
 interface Knot {
@@ -59,10 +61,12 @@ const KNOTS: Knot[] = [];
 const angDist = (a: V3, b: V3) => Math.acos(clamp(dot(a, b), -1, 1));
 
 /** 网上一点的世界坐标（含撞网鼓包、缺口撑开、手工编织的微小不规则） */
-export function netPoint(az: number, el: number, s: number, bul: number, hole: number): V3 {
+export function netPoint(az: number, el: number, s: number, bul: number, hole: number, sag = 0): V3 {
   const jaz = az + 0.05 * DEG * Math.sin(el * 37 + az * 11);
   const jel = el + 0.05 * DEG * Math.sin(az * 29 + el * 13);
-  let d = sph(jaz, jel);
+  // 纬线在两个网结之间微微下垂（像真的网）
+  const f = (((az / AZ_STEP) % 1) + 1) % 1;
+  let d = sph(jaz, jel - sag * Math.sin(Math.PI * f));
   let r = R;
   if (bul !== 0) {
     const dl = angDist(d, CRANE_DIR);
@@ -108,7 +112,7 @@ export function buildNet(cam: Cam, s: number) {
     let prevOk = false;
     let prevD = 0;
     for (const [az, el] of L.pts) {
-      const w = netPoint(az, el, s, bul, hole);
+      const w = netPoint(az, el, s, bul, hole, L.isPar ? SAG : 0);
       const dc = angDist(norm(w), CRANE_DIR);
       const ok = dc <= reach;
       const p = project(cam, w);
@@ -121,7 +125,8 @@ export function buildNet(cam: Cam, s: number) {
         const b = coc(cam, z);
         const lit = L.isPar ? parLit(el, s) : parLit(Math.max(el, 10 * DEG), s) * 0.8;
         const a = base * lod * fog * front / (1 + b * 0.45);
-        if (a > 0.008) segs.push({x0: prev[0], y0: prev[1], x1: p[0], y1: p[1], z, a, w: 1.05 + b * 0.7, warm: lit});
+        const wpx = clamp((THICK * cam.focal) / z, 0.9, 7); // 近处的丝线按真实粗细变粗
+        if (a > 0.008) segs.push({x0: prev[0], y0: prev[1], x1: p[0], y1: p[1], z, a: a * Math.min(1, 2.2 / wpx + 0.35), w: wpx + b * 0.7, warm: lit});
       }
       prev = p;
       prevOk = ok;
@@ -138,7 +143,7 @@ export function drawNetSegs(ctx: Ctx, segs: NetSeg[], zMin: number, zMax: number
     if (g.z < zMin || g.z >= zMax) continue;
     const ai = Math.min(23, Math.round(g.a * 24));
     if (ai <= 0) continue;
-    const wi = Math.min(7, Math.round((g.w - 1) * 2));
+    const wi = Math.max(0, Math.min(29, Math.round(Math.log2(Math.max(0.9, g.w) / 0.9) * 4)));
     const ci = g.warm > 0.5 ? 1 : 0;
     const key = ci * 1000 + wi * 30 + ai;
     let p = buckets.get(key);
@@ -148,12 +153,22 @@ export function drawNetSegs(ctx: Ctx, segs: NetSeg[], zMin: number, zMax: number
   }
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
-  for (const [key, p] of buckets) {
-    const ci = Math.floor(key / 1000), wi = Math.floor((key % 1000) / 30), ai = key % 30;
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = rgba(ci ? COL.netLit : COL.net, ai / 24);
-    ctx.lineWidth = 1 + wi / 2;
-    ctx.stroke(p);
+  // 两遍：柔和的光晕 + 细亮的芯
+  for (const pass of [0, 1]) {
+    for (const [key, p] of buckets) {
+      const ci = Math.floor(key / 1000), wi = Math.floor((key % 1000) / 30), ai = key % 30;
+      const w = 0.9 * Math.pow(2, wi / 4);
+      const col = ci ? COL.netLit : COL.net;
+      ctx.globalAlpha = 1;
+      if (pass === 0) {
+        ctx.strokeStyle = rgba(col, (ai / 24) * 0.13);
+        ctx.lineWidth = w * 4 + 2;
+      } else {
+        ctx.strokeStyle = rgba(col.map(v => Math.min(255, v + 40)), ai / 24);
+        ctx.lineWidth = w;
+      }
+      ctx.stroke(p);
+    }
   }
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -170,6 +185,7 @@ export function drawKnots(ctx: Ctx, cam: Cam, s: number) {
     const w = netPoint(k.az, k.el, s, bul, hole);
     const dc = angDist(norm(w), CRANE_DIR);
     if (dc > weave[k.lv]) continue;
+    void SAG;
     const p = project(cam, w);
     if (p[2] <= 0 || p[0] < -60 || p[0] > cam.cx * 2 + 60 || p[1] < -60 || p[1] > cam.cy * 2 + 60) continue;
     const px = cam.focal / p[2];
@@ -190,9 +206,9 @@ export function drawKnots(ctx: Ctx, cam: Cam, s: number) {
       blit(ctx, k.warm ? gW : gC, p[0], p[1], d * 2.2, (0.55 * amp) / (1 + b * 0.25));
       if (k.lv === 0 || flash > 0.3) blit(ctx, k.warm ? fW : fC, p[0], p[1], d * (2.4 + flash * 1.6), 0.5 * amp);
     }
-    if (lit < 0.99 && k.lv < 2) {
-      const d = clamp(px * 0.07, 1.6, 10);
-      blit(ctx, gN, p[0], p[1], d * 2.4, 0.4 * vis * (1 - lit) * ss(2, 9, (SPACING[k.lv] * cam.focal) / p[2]));
+    if (lit < 0.99) {
+      const d = clamp(px * 0.045, 1.6, 22);
+      blit(ctx, gN, p[0], p[1], d * 2.6, 0.55 * vis * (1 - lit) * ss(2, 9, (SPACING[k.lv] * cam.focal) / p[2]));
     }
   }
   ctx.globalAlpha = 1;
@@ -401,6 +417,12 @@ export function drawStar(ctx: Ctx, cam: Cam, s: number) {
   blit(ctx, glow(COL.singerHalo, 0), p[0], p[1], clamp(px * 22, 200, 1100) * breath, (0.16 * on + 0.3 * fl) * clamp(260 / (px * 22)));
   blit(ctx, glow(COL.singer, 0.4), p[0], p[1], clamp(px * 6, 60, 420) * breath, (0.5 * on + 0.5 * fl) * clamp(0.35 + 120 / (px * 6)));
   blit(ctx, glow([255, 255, 255], 1), p[0], p[1], clamp(px * 1.4, 16, 90), 0.95 * on + fl);
+  // 变形宽银幕镜头那种横向光条
+  ctx.save();
+  ctx.translate(p[0], p[1]);
+  ctx.scale(14, 0.07);
+  blit(ctx, glow([170, 190, 255], 0.3), 0, 0, clamp(px * 6, 60, 260), 0.55 * (on + fl));
+  ctx.restore();
   // 慢慢转动的星芒
   const fr = flare(COL.singer);
   const d = clamp(px * 11, 140, 640) * (1 + 0.6 * fl) * breath;
@@ -501,6 +523,17 @@ export function drawThread(ctx: Ctx, cam: Cam, s: number, beak: V3) {
 }
 
 // ═════════════ 银河列车 ═════════════
+// 夜行列车：圆弧车顶的截面沿轨道挤出，一排暖色小窗，窗光往外溢，车顶一道冷色高光
+const PROFILE: Array<[number, number]> = (() => {
+  // 截面（y 向外 N、z 向上 B），从右下逆时针
+  const pts: Array<[number, number]> = [[0.3, -0.36], [0.33, 0.1]];
+  for (let i = 0; i <= 6; i++) {
+    const a = (i / 6) * Math.PI;
+    pts.push([0.33 * Math.cos(a), 0.1 + 0.26 * Math.sin(a)]);
+  }
+  pts.push([-0.33, 0.1], [-0.3, -0.36]);
+  return pts;
+})();
 export interface TrainItem {
   z: number;
   draw: (ctx: Ctx) => void;
@@ -510,69 +543,110 @@ export function prepareTrain(cam: Cam, s: number): TrainItem[] {
   if (vis <= 0) return [];
   const head = trainHead(s);
   const items: TrainItem[] = [];
+  const key = norm([0.2, 1, 0.3]);
   for (let k = 0; k < CARS; k++) {
-    const dc = head - (k + 0.5) * CAR_LEN * 1.06;
-    // 从轨道起点“凝结”出来，开进星里时溶进光
+    const dc = head - (k + 0.5) * CAR_LEN * 1.08;
     const born = ss(-1.5, 1.0, dc), gone = 1 - ss(RAIL_TOTAL - 4, RAIL_TOTAL + 0.5, dc);
     const a = vis * born * gone;
     if (a <= 0.01) continue;
-    const f = railFrame(dc);
-    const c = add(f.p, mul(f.B, 0.42));
-    const hl = CAR_LEN / 2, hw = 0.32, hh = 0.36;
-    const P = (x: number, y: number, z: number): V3 => add(c, add(add(mul(f.T, x * hl), mul(f.N, y * hw)), mul(f.B, z * hh)));
-    const cz = project(cam, c)[2];
+    const f0 = railFrame(dc - CAR_LEN / 2), f1 = railFrame(dc + CAR_LEN / 2), fm = railFrame(dc);
+    const lift = 0.42;
+    // 车身沿轨道略弯：两端各用自己的局部系
+    const P = (end: 0 | 1, y: number, z: number): V3 => {
+      const f = end ? f1 : f0;
+      return add(f.p, add(mul(f.N, y), mul(f.B, z + lift)));
+    };
+    const cz = project(cam, add(fm.p, mul(fm.B, lift)))[2];
     items.push({
       z: cz,
       draw: ctx => {
         if (cz <= 0.2) return;
-        const faces: Array<{q: V3[]; n: V3; side: number}> = [
-          {q: [P(-1, 1, -1), P(1, 1, -1), P(1, 1, 1), P(-1, 1, 1)], n: f.N, side: 1},
-          {q: [P(-1, -1, -1), P(1, -1, -1), P(1, -1, 1), P(-1, -1, 1)], n: mul(f.N, -1), side: -1},
-          {q: [P(-1, -1, 1), P(1, -1, 1), P(1, 1, 1), P(-1, 1, 1)], n: f.B, side: 0},
-          {q: [P(1, -1, -1), P(1, 1, -1), P(1, 1, 1), P(1, -1, 1)], n: f.T, side: 2},
-          {q: [P(-1, -1, -1), P(-1, 1, -1), P(-1, 1, 1), P(-1, -1, 1)], n: mul(f.T, -1), side: 3},
-        ];
-        for (const fc of faces) {
-          const view = norm(sub(cam.pos, fc.q[0]));
-          if (dot(view, fc.n) <= 0) continue;
-          const pr = fc.q.map(q => project(cam, q));
-          if (pr.some(p => p[2] <= 0.2)) continue;
+        const px = cam.focal / cz;
+        // 车身各面（画家算法）
+        const faces: Array<{q: V3[]; n: V3; i: number}> = [];
+        for (let i = 0; i < PROFILE.length - 1; i++) {
+          const [y0, z0] = PROFILE[i], [y1, z1] = PROFILE[i + 1];
+          const q = [P(0, y0, z0), P(1, y0, z0), P(1, y1, z1), P(0, y1, z1)];
+          const ny = z1 - z0, nz = -(y1 - y0); // 截面外法线
+          const n = norm(add(mul(fm.N, ny), mul(fm.B, nz)));
+          faces.push({q, n, i});
+        }
+        const cap = (end: 0 | 1) => ({q: PROFILE.map(([y, z]) => P(end, y, z)), n: mul(fm.T, end ? 1 : -1), i: -1});
+        faces.push(cap(0), cap(1));
+        const vis2 = faces
+          .map(fc => ({...fc, pr: fc.q.map(q => project(cam, q)), d: dot(norm(sub(cam.pos, fc.q[0])), fc.n)}))
+          .filter(fc => fc.d > 0 && fc.pr.every(p => p[2] > 0.2));
+        vis2.sort((x, y) => y.pr.reduce((m, p) => m + p[2], 0) / y.pr.length - x.pr.reduce((m, p) => m + p[2], 0) / x.pr.length);
+        for (const fc of vis2) {
+          const lam = Math.max(0, dot(fc.n, key));
+          const base = [16 + 40 * lam, 20 + 46 * lam, 46 + 70 * lam];
           ctx.globalCompositeOperation = 'source-over';
-          ctx.globalAlpha = 0.92 * a;
-          ctx.fillStyle = '#0b1028';
+          ctx.globalAlpha = 0.96 * a;
+          ctx.fillStyle = rgba(base, 1);
           ctx.beginPath();
-          pr.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+          fc.pr.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
           ctx.closePath();
           ctx.fill();
-          ctx.globalAlpha = 0.45 * a;
-          ctx.strokeStyle = rgba([150, 170, 230], 0.8);
-          ctx.lineWidth = 1;
+          ctx.globalAlpha = 0.25 * a;
+          ctx.strokeStyle = 'rgb(120,140,210)';
+          ctx.lineWidth = Math.max(0.6, px * 0.004);
           ctx.stroke();
-          // 车窗
-          if (fc.side === 1 || fc.side === -1) {
-            ctx.globalCompositeOperation = 'lighter';
-            for (let wi = 0; wi < 4; wi++) {
-              const x0 = -0.78 + wi * 0.42, x1 = x0 + 0.3;
-              const y = fc.side;
-              const wq = [P(x0, y * 1.001, -0.15), P(x1, y * 1.001, -0.15), P(x1, y * 1.001, 0.55), P(x0, y * 1.001, 0.55)].map(q => project(cam, q));
-              ctx.globalAlpha = 0.6 * a;
-              ctx.fillStyle = rgba([255, 178, 96], 0.85);
-              ctx.beginPath();
-              wq.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
-              ctx.closePath();
-              ctx.fill();
-            }
+        }
+        // 车顶冷色高光
+        ctx.globalCompositeOperation = 'lighter';
+        const r0 = project(cam, P(0, 0, 0.36)), r1 = project(cam, P(1, 0, 0.36));
+        if (r0[2] > 0.2 && r1[2] > 0.2) {
+          ctx.globalAlpha = 0.5 * a;
+          ctx.strokeStyle = 'rgb(170,190,255)';
+          ctx.lineWidth = Math.max(0.8, px * 0.012);
+          ctx.beginPath();
+          ctx.moveTo(r0[0], r0[1]);
+          ctx.lineTo(r1[0], r1[1]);
+          ctx.stroke();
+        }
+        // 窗：两侧各 6 扇，暖光 + 往外溢的光
+        const win = glow([255, 190, 120], 0.3);
+        for (const side of [1, -1]) {
+          const sideN = mul(fm.N, side);
+          if (dot(norm(sub(cam.pos, add(fm.p, mul(sideN, 0.4)))), sideN) <= 0) continue;
+          for (let w = 0; w < 6; w++) {
+            const u0 = 0.1 + w * 0.14, u1 = u0 + 0.095;
+            const Q = (u: number, z: number): V3 => {
+              const pa = P(0, side * 0.334, z), pb = P(1, side * 0.334, z);
+              return add(mul(pa, 1 - u), mul(pb, u));
+            };
+            const q = [Q(u0, 0.0), Q(u1, 0.0), Q(u1, 0.2), Q(u0, 0.2)].map(p => project(cam, p));
+            if (q.some(p => p[2] <= 0.2)) continue;
+            const flick = 0.85 + 0.15 * Math.sin(s * 3 + w * 1.7 + k);
+            ctx.globalAlpha = 0.85 * a * flick;
+            ctx.fillStyle = 'rgb(255,198,128)';
+            ctx.beginPath();
+            q.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+            ctx.closePath();
+            ctx.fill();
+            const c = q.reduce((m, p) => [m[0] + p[0] / 4, m[1] + p[1] / 4], [0, 0]);
+            blit(ctx, win, c[0], c[1], clamp(px * 0.55, 6, 160), 0.35 * a * flick);
           }
         }
-        ctx.globalCompositeOperation = 'lighter';
-        const pc = project(cam, c);
-        const px = cam.focal / pc[2];
-        blit(ctx, glow(COL.window, 0.2), pc[0], pc[1], px * 3.6, 0.22 * a);
+        // 车头灯：柔光 + 顺着轨道的一束光
         if (k === 0) {
-          const hp = project(cam, P(1.05, 0, 0.1));
+          const hp = project(cam, P(1, 0, 0.0));
           if (hp[2] > 0.2) {
-            blit(ctx, glow([255, 244, 214], 0.9), hp[0], hp[1], px * 1.6, 0.9 * a);
-            blit(ctx, flare([255, 236, 200]), hp[0], hp[1], px * 3.2, 0.7 * a);
+            blit(ctx, glow([255, 240, 214], 0.8), hp[0], hp[1], clamp(px * 0.9, 10, 260), 0.85 * a);
+            const far = project(cam, add(railAt(dc + CAR_LEN / 2 + 7), mul(railFrame(dc + 7).B, lift)));
+            if (far[2] > 0.2) {
+              const g = ctx.createLinearGradient(hp[0], hp[1], far[0], far[1]);
+              g.addColorStop(0, 'rgba(255,236,200,0.22)');
+              g.addColorStop(1, 'rgba(255,236,200,0)');
+              ctx.globalAlpha = a;
+              ctx.strokeStyle = g;
+              ctx.lineCap = 'round';
+              ctx.lineWidth = clamp(px * 0.5, 4, 120);
+              ctx.beginPath();
+              ctx.moveTo(hp[0], hp[1]);
+              ctx.lineTo(far[0], far[1]);
+              ctx.stroke();
+            }
           }
         }
         ctx.globalAlpha = 1;
@@ -587,16 +661,16 @@ export function prepareTrain(cam: Cam, s: number): TrainItem[] {
       ctx.globalCompositeOperation = 'lighter';
       const r = rng(5);
       const g = glow(COL.star, 0.7);
-      for (let i = 0; i < 160; i++) {
-        const back = r() * 16, age = back / 6;
-        const d = head - CAR_LEN * CARS * 1.06 - back + 2 * CAR_LEN * CARS * 0 + 0;
-        const dd = head - back;
+      const tail = head - CAR_LEN * CARS * 1.08;
+      for (let i = 0; i < 180; i++) {
+        const back = r() * 18, age = back / 6;
+        const dd = tail - back + 0.5;
         if (dd < 0 || dd > RAIL_TOTAL) continue;
         const f = railFrame(dd);
-        const off = add(mul(f.N, (r() - 0.5) * 1.6 * (0.3 + age)), mul(f.B, 0.6 + age * 1.2 * r()));
+        const off = add(mul(f.N, (r() - 0.5) * 1.6 * (0.3 + age)), mul(f.B, 0.5 + age * 1.1 * r()));
         const p = project(cam, add(f.p, off));
-        if (p[2] <= 0.2 || d > 1e9) continue;
-        blit(ctx, g, p[0], p[1], clamp((cam.focal / p[2]) * 0.22, 2, 22), 0.55 * vis * Math.exp(-age) * (0.4 + 0.6 * r()));
+        if (p[2] <= 0.2) continue;
+        blit(ctx, g, p[0], p[1], clamp((cam.focal / p[2]) * 0.18, 2, 18), 0.6 * vis * Math.exp(-age) * (0.4 + 0.6 * r()));
       }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';

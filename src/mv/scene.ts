@@ -18,11 +18,11 @@ export const STAR: V3 = [0, 34, 0]; // 唱歌的那颗星（穹顶正上方，�
 // ───────────── 网的状态 ─────────────
 /** 三层网：0 粗（10°/8°）→ 1（5°/4°）→ 2 细（2.5°/2°），从纸鹤处向外“织”开 */
 export const netWeave = (lv: number, s: number) => {
-  const t0 = [CUE.c1 + 1.05, CUE.c2 + 0.55, CUE.c2 + 1.2][lv];
+  const t0 = [CUE.c2, CUE.c2 + 0.55, CUE.c2 + 1.1][lv]; // 「困在一张」织出粗网，「没空隙」织满
   return (s - t0) * [62, 80, 95][lv] * DEG; // 已织到的角半径
 };
-/** 撞网：纸鹤冲向网，网被顶出鼓包后回弹 */
-export const T_HIT = CUE.c3 + 0.55;
+/** 撞网：「太耀眼」时纸鹤冲向光，在「灼」字撞上网，被弹回 */
+export const T_HIT = CUE.c4 + 1.5;
 export const bulge = (s: number) => {
   if (s < T_HIT - 0.2) return 0;
   const x = s - T_HIT;
@@ -38,15 +38,33 @@ export const RING_SPEED = 38 * DEG; // 每秒下扫的角度
 export const ringEl = (k: number, s: number) => Math.PI / 2 - (s - RINGS[k]) * RING_SPEED;
 /** 网线的亮度系数（点亮成星后网线退成星座连线） */
 export const netLineVis = (s: number) => lerp(1, 0.38, ss(CUE.c8, CUE.post + 1.5, s)) * lerp(1, 0.55, ss(CUE.v1, CUE.v1 + 6, s));
+/** 外圈楼群的窗：「我们的周围并非没光亮」时一栋栋亮起来 */
+export const towerLights = (s: number, seed: number) => {
+  const t0 = CUE.c3 + 0.1 + seed * 1.7;
+  const tt = s - t0;
+  if (tt < 0) return 0.22;
+  if (tt < 0.06) return 0.9;
+  if (tt < 0.12) return 0.3;
+  if (tt < 0.18) return 1;
+  return 1;
+};
+/** 「太耀眼」：整体曝光推高，撞网那一下闪白 */
+export const exposure = (s: number) => 1 + 0.7 * ss(CUE.c4, T_HIT, s) * (1 - ss(T_HIT, T_HIT + 0.5, s));
+export const whiteFlash = (s: number) => {
+  const hit = s >= T_HIT ? Math.exp(-(s - T_HIT) * 9) : 0;
+  const star = s >= CUE.c6 ? 0.45 * Math.exp(-(s - CUE.c6) * 6) : 0;
+  const train = s >= CUE.train ? 0.25 * Math.exp(-(s - CUE.train) * 8) : 0;
+  return Math.max(hit, star, train);
+};
 /** 网外真实天空的可见度 */
 export const skyVis = (s: number) => 0.1 + 0.9 * ss(CUE.c8 + 0.5, CUE.post + 4, s);
 
 // ───────────── 星 ─────────────
 export const starOn = (s: number) => {
-  const ig = prog(s, CUE.c6 + 0.15, CUE.c6 + 0.7);
+  const ig = prog(s, CUE.c6 - 0.02, CUE.c6 + 0.5);
   return ig <= 0 ? 0 : E.o3(ig);
 };
-export const starFlash = (s: number) => bump(s, CUE.c6 + 0.1, CUE.c6 + 0.35, CUE.c6 + 0.4, CUE.c6 + 1.6);
+export const starFlash = (s: number) => bump(s, CUE.c6 - 0.02, CUE.c6 + 0.12, CUE.c6 + 0.2, CUE.c6 + 1.4);
 
 // ───────────── 铁道（光线化成的轨道）─────────────
 // 从缺口外侧出发，绕着穹顶外壁螺旋上升，最后卷进那颗星
@@ -133,13 +151,14 @@ function craneOnRail(s: number): V3 {
 const N_OUT = GAP_DIR;
 const cranePre = path3([
   [CUE.zhiyin - 0.3, C0],
-  [T_HIT - 0.75, add(C0, [0, -0.04, -0.12]), 0],
-  [T_HIT, add(C0, mul(N_OUT, 0.92)), 0.6],
-  [T_HIT + 0.8, add(C0, [0, -0.12, -0.55]), 0],
-  [CUE.c5, add(C0, [0, -0.3, -0.35]), 0],
-  [CUE.c7 + 1, add(C0, [0, -0.2, -0.3]), 0],
-  [CUE.post + 1.5, add(C0, [0, 0.02, -0.15]), 0],
-  [CUE.bridge + 4.4, add(C0, [0, 0.1, -0.1]), 0],
+  [CUE.c4 - 0.1, add(C0, [0, -0.03, -0.28]), 0], // 蓄力后退
+  [T_HIT, add(C0, mul(N_OUT, 0.92)), 0.6], // 撞网
+  [T_HIT + 0.8, add(C0, [0, -0.5, -0.9]), 0], // 弹回
+  [CUE.c6 - 0.1, add(C0, [0, -1.3, -1.1]), 0], // 「迷茫」里往下沉
+  [CUE.c7 - 0.2, add(C0, [0, -0.9, -0.8]), 0], // 看见星，慢慢浮起
+  [CUE.post, add(C0, [0, -0.6, -0.5]), 0],
+  [CUE.bridge, add(C0, [0, -0.3, -0.3]), 0],
+  [CUE.bridge + 3.8, add(C0, [0, 0.0, -0.1]), 0],
   [CUE.v1 - 2.4, add(C0, [0, 0.06, 0.05]), 0],
   [CUE.v1 - 0.9, add(GAP, mul(N_OUT, -0.3)), 1],
 ]);
@@ -174,14 +193,17 @@ export function craneFrame(s: number) {
 export const craneHead = path1([
   [CUE.c1, 0.1],
   [CUE.c2, 0.25],
-  [T_HIT - 0.4, 0.45],
-  [T_HIT + 1.0, -0.35],
-  [CUE.c6, -0.75],
-  [CUE.c7 + 0.6, 0.15],
-  [CUE.c8 + 1.0, 0.75],
-  [CUE.post + 2.0, 0.45],
-  [CUE.bridge + 3.2, 0.9],
-  [CUE.bridge + 4.7, 0.25],
+  [CUE.c4, 0.5],
+  [T_HIT, 0.6],
+  [T_HIT + 0.8, -0.4],
+  [CUE.c6 - 0.1, -0.85],
+  [CUE.c6 + 0.4, 0.2],
+  [CUE.c6 + 1.0, 0.9], // 抬头看见那颗星
+  [CUE.c8 + 1.0, 0.8],
+  [CUE.post + 2.0, 0.5],
+  [CUE.bridge, 0.9],
+  [CUE.bridge + 3.0, 0.8],
+  [CUE.bridge + 4.0, 0.25],
   [CUE.v1 - 1.5, 0.05],
   [CUE.v1 + 1, 0.2],
   [CUE.please1, 0.45],
@@ -192,10 +214,12 @@ export function craneWing(s: number) {
   const rest = path1([
     [CUE.zhiyin, 0.42],
     [CUE.c2, 0.55],
-    [T_HIT - 0.55, 0.62],
-    [T_HIT - 0.3, 0.1],
-    [T_HIT + 0.9, 0.85],
-    [CUE.c5, 0.55],
+    [CUE.c4 - 0.2, 0.62],
+    [CUE.c4 + 0.1, 0.15],
+    [T_HIT + 0.1, 0.2],
+    [T_HIT + 0.8, 0.9],
+    [CUE.c6 - 0.1, 0.25],
+    [CUE.c6 + 1, 0.5],
     [CUE.c7 + 1, 0.6],
     [CUE.post + 2, 0.2],
     [CUE.bridge + 4.4, 0.35],
@@ -204,7 +228,7 @@ export function craneWing(s: number) {
     [CUE.v1 + 0.6, 0.15],
   ])(s);
   // 撞网前的两下急扇、出网后的慢扇（两拍一下）
-  const lunge = bump(s, T_HIT - 0.35, T_HIT - 0.25, T_HIT + 0.2, T_HIT + 0.5) * 0.75 * Math.sin((s - T_HIT) * 2 * Math.PI * 3.2);
+  const lunge = bump(s, CUE.c4 - 0.1, CUE.c4 + 0.1, T_HIT + 0.05, T_HIT + 0.4) * 0.72 * Math.sin(((s - CUE.c4) / BEAT) * 2 * Math.PI); // 一拍一扇
   const flyW = ss(CUE.v1 + 0.2, CUE.v1 + 1.2, s) * (1 - 0.6 * bump(s, CUE.please2 - 0.4, CUE.please2 + 0.4, 99, 100));
   const flap = flyW * 0.62 * Math.sin(((s - DOWNBEAT) / (BEAT * 2)) * 2 * Math.PI);
   const breathe = 0.06 * Math.sin(s * 1.7);

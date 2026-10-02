@@ -3,7 +3,7 @@ import {CUE, H, SONG_IN, SONG_OUT, W} from './config';
 import {drawCityGlow, drawFarGround, drawGround, drawSkyTexture, drawTowers} from './backdrop';
 import {camera} from './camera';
 import {prepareCrane} from './crane';
-import {bulge, holeOpen} from './scene';
+import {bulge, exposure, holeOpen, whiteFlash} from './scene';
 import {grain, offscreen} from './sprites';
 import {Cam} from './v3';
 import {drawScreenLyrics, drawWorldLyrics} from './lyricfx';
@@ -38,6 +38,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, s: number) {
   drawDust(ctx, cam, s, 0.55 + 0.45 * ss(CUE.c7, CUE.post, s));
 
   post(ctx, s);
+  letterbox(ctx);
   drawScreenLyrics(ctx, cam, s);
   drawTitle(ctx, s);
   fades(ctx, s);
@@ -63,7 +64,7 @@ function drawBackground(ctx: CanvasRenderingContext2D, cam: Cam, s: number) {
   drawCityGlow(ac, half, s);
   drawTowers(ac, half, s);
   drawGround(ac, half, s, ss(CUE.c1, CUE.c3, s));
-  const blur = clamp((cam.aperture * cam.focal) / cam.focus, 0.25, 9) * 0.5; // 半分辨率下的像素
+  const blur = clamp((cam.aperture * cam.focal) / cam.focus, 0.25, 14) * 0.5; // 半分辨率下的像素
   bc.setTransform(1, 0, 0, 1, 0, 0);
   bc.globalCompositeOperation = 'copy';
   bc.filter = `blur(${blur.toFixed(2)}px)`;
@@ -80,7 +81,7 @@ function post(ctx: CanvasRenderingContext2D, s: number) {
   const a = offscreen('bloomA', 480, 270), b = offscreen('bloomB', 240, 135);
   const ac = a.getContext('2d')!, bc = b.getContext('2d')!;
   ac.globalCompositeOperation = 'copy';
-  ac.filter = 'brightness(1.05) contrast(1.6) blur(3px)';
+  ac.filter = 'brightness(0.62) contrast(2.4) blur(3px)'; // 只让高光泛出来
   ac.drawImage(ctx.canvas, 0, 0, 480, 270);
   ac.filter = 'none';
   bc.globalCompositeOperation = 'copy';
@@ -90,10 +91,23 @@ function post(ctx: CanvasRenderingContext2D, s: number) {
   ctx.save();
   ctx.imageSmoothingQuality = 'high';
   ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = 0.42;
+  const ex = exposure(s);
+  ctx.globalAlpha = Math.min(1, 0.75 * ex);
   ctx.drawImage(a, 0, 0, W, H);
-  ctx.globalAlpha = 0.5;
+  ctx.globalAlpha = Math.min(1, 0.85 * ex);
   ctx.drawImage(b, 0, 0, W, H);
+  if (ex > 1.05) {
+    ctx.globalAlpha = Math.min(1, 0.6 * (ex - 1));
+    ctx.drawImage(b, 0, 0, W, H);
+  }
+  // 闪白（撞网 / 星亮 / 列车进场）
+  const fl = whiteFlash(s);
+  if (fl > 0.01) {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = Math.min(1, fl);
+    ctx.fillStyle = '#fff6ec';
+    ctx.fillRect(0, 0, W, H);
+  }
   // 暗角
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
@@ -110,6 +124,19 @@ function post(ctx: CanvasRenderingContext2D, s: number) {
   ctx.translate((fi * 73) % 256, (fi * 151) % 256);
   ctx.fillStyle = pat;
   ctx.fillRect(-256, -256, W + 512, H + 512);
+  ctx.restore();
+}
+
+/** 电影遮幅（约 2.35:1） */
+export const BAR = 116;
+function letterbox(ctx: CanvasRenderingContext2D) {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#020309';
+  ctx.fillRect(0, 0, W, BAR);
+  ctx.fillRect(0, H - BAR, W, BAR);
   ctx.restore();
 }
 
