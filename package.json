@@ -8,6 +8,8 @@
     "still": "remotion still src/index.ts Promo"
   },
   "dependencies": {
+    "@fontsource-variable/noto-serif-sc": "^5.3.0",
+    "@fontsource/cormorant-garamond": "^5.3.0",
     "@remotion/cli": "4.0.532",
     "react": "19.2.0",
     "react-dom": "19.2.0",
