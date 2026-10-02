@@ -12,6 +12,7 @@ export interface LayerInfo {
 }
 export interface Manifest {
   s01: {bg: string; layers: LayerInfo[]};
+  s01b: {bg: string};
   s02: {bg: string};
   s03: {bg: string};
   s04: {bg: string};
@@ -33,16 +34,29 @@ interface P {
 
 const p01 = (t: number, s: Shot) => prog(t, s.from, s.to);
 
-// ── 海边：两只并肩看海 ──
+// ── 海边：原图那只望着海（不做任何复制合成） ──
 export const S01: React.FC<P> = ({t, shot, m}) => {
   const p = p01(t, shot);
-  const [b, a] = m.s01.layers;
+  const [a] = m.s01.layers;
   return (
-    <AbsoluteFill style={kbTransform({s: [1.0, 1.07], y: [0, -10], oy: 0.55}, p)}>
+    <AbsoluteFill style={kbTransform({s: [1.0, 1.06], x: [0, 12], ox: 0.45, oy: 0.55}, p)}>
       <Plate src={m.s01.bg} filter="saturate(0.9) contrast(1.03)" />
-      <Canvas deps={[t]} draw={ctx => glints(ctx, t, 34, 'sea', [0, 1060, W, 1620], 0.75)} />
-      <Layer l={b} t={t} phase={1.7} filter="saturate(0.9) brightness(0.97)" />
-      <Layer l={a} t={t} filter="saturate(0.92)" />
+      <Canvas deps={[t]} draw={ctx => glints(ctx, t, 30, 'sea', [0, 1060, W, 1620], 0.75)} />
+      <Layer l={a} t={t} breathe={0.005} filter="saturate(0.92)" />
+    </AbsoluteFill>
+  );
+};
+
+// ── 反打：它望着的那一只，漂在海里仰着脸 ──
+export const S01b: React.FC<P> = ({t, shot, m}) => {
+  const p = p01(t, shot);
+  const bob = Math.sin(t * 1.9) * 6 + Math.sin(t * 0.8 + 1) * 4;
+  return (
+    <AbsoluteFill style={kbTransform({s: [1.1, 1.04], ox: 0.62, oy: 0.4}, p)}>
+      <AbsoluteFill style={{transform: `translateY(${bob.toFixed(2)}px) rotate(${(Math.sin(t * 1.3) * 0.35).toFixed(3)}deg)`}}>
+        <Plate src={m.s01b.bg} filter="saturate(0.88) contrast(1.02) brightness(1.03)" bloom={0.24} />
+      </AbsoluteFill>
+      <Canvas deps={[t]} draw={ctx => glints(ctx, t, 46, 'sea2', [160, 400, 1040, 980], 0.9)} />
     </AbsoluteFill>
   );
 };
@@ -133,29 +147,26 @@ export const S04: React.FC<P> = ({t, shot, m}) => {
   );
 };
 
-// ── 霍普《夏夜》：两只坐在门廊上 ──
-export const S06: React.FC<P> = ({t, shot, m}) => {
-  const p = p01(t, shot);
-  return (
-    <AbsoluteFill style={kbTransform({s: [1.0, 1.06], oy: 0.6}, p)}>
-      <Plate src={m.s06.both} filter="saturate(1.06) sepia(0.12) contrast(1.03)" bloom={0.2} />
-      <Canvas deps={[t]} draw={ctx => fireflies(ctx, t, 16, 'ff', [100, 120, 1000, 1500], 0.85)} />
-    </AbsoluteFill>
-  );
-};
+// ── 霍普《夏夜》：两只坐在门廊上 → 右边那只化成光点散去（一个镜头跨两句歌词） ──
+// 整幅画面（一只的底图 + 还没散掉的那只 + 柔光）都画在同一张画布上，再统一套调色，
+// 所以“散”之前和原图完全一样，不会有抠图贴上去的色差。
+export const PORCH_DISSOLVE = {D0: 29.3, D1: 31.7};
 
-// ── 同一个门廊：右边那只化成光点散去 ──
-interface Dissolve {
-  both: ImageData;
-  mask: Float32Array;
+interface Porch {
+  both: HTMLImageElement;
+  alone: HTMLImageElement;
+  bd: ImageData;
+  mR: Float32Array; // 右边那只（外扩一圈）：随噪声自上而下扫掠消散
+  mG: Float32Array; // 其余差别（它投在墙上的影子）：整体淡掉
   noise: Float32Array;
   box: [number, number, number, number];
   seeds: {x: number; y: number; r: number; g: number; b: number; th: number; vx: number; vy: number; s: number}[];
   work: HTMLCanvasElement;
+  comp: HTMLCanvasElement;
 }
 
-async function prepDissolve(m: Manifest): Promise<Dissolve> {
-  const [both, rm] = await Promise.all([loadImage(img(m.s06.both)), loadImage(img(m.s06.rmask))]);
+async function prepPorch(m: Manifest): Promise<Porch> {
+  const [both, alone, rm] = await Promise.all([loadImage(img(m.s06.both)), loadImage(img(m.s06.alone)), loadImage(img(m.s06.rmask))]);
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;
@@ -165,121 +176,154 @@ async function prepDissolve(m: Manifest): Promise<Dissolve> {
   g.clearRect(0, 0, W, H);
   g.drawImage(rm, 0, 0, W, H);
   const md = g.getImageData(0, 0, W, H).data;
-  const mask = new Float32Array(W * H);
+  const mR = new Float32Array(W * H);
+  const mG = new Float32Array(W * H);
   let x0 = W, y0 = H, x1 = 0, y1 = 0;
+  let ry0 = H, ry1 = 0;
   for (let i = 0; i < W * H; i++) {
-    const v = md[i * 4] / 255;
-    mask[i] = v;
-    if (v > 0.02) {
+    const r = md[i * 4] / 255, gg = md[i * 4 + 1] / 255;
+    mR[i] = r;
+    mG[i] = gg;
+    if (r > 0.01 || gg > 0.01) {
       const x = i % W, y = (i / W) | 0;
       if (x < x0) x0 = x;
       if (x > x1) x1 = x;
       if (y < y0) y0 = y;
       if (y > y1) y1 = y;
+      if (r > 0.5) {
+        if (y < ry0) ry0 = y;
+        if (y > ry1) ry1 = y;
+      }
     }
   }
-  // 平滑噪声（几层值噪声叠加）+ 自上而下的倾向：先从头顶开始散
+  // 平滑噪声 + 自上而下：从头顶开始散
   const noise = new Float32Array(W * H);
   const lat = (gx: number, gy: number, s: string) => random(`${s}-${gx}-${gy}`);
   const vnoise = (x: number, y: number, cell: number, s: string) => {
     const gx = Math.floor(x / cell), gy = Math.floor(y / cell);
     const fx = x / cell - gx, fy = y / cell - gy;
     const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
-    const a = lat(gx, gy, s), b = lat(gx + 1, gy, s), c2 = lat(gx, gy + 1, s), d = lat(gx + 1, gy + 1, s);
-    return lerp(lerp(a, b, u), lerp(c2, d, u), v);
+    return lerp(lerp(lat(gx, gy, s), lat(gx + 1, gy, s), u), lerp(lat(gx, gy + 1, s), lat(gx + 1, gy + 1, s), u), v);
   };
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
       const n = 0.55 * vnoise(x, y, 70, 'n1') + 0.3 * vnoise(x, y, 24, 'n2') + 0.15 * vnoise(x, y, 8, 'n3');
-      const top = (y - y0) / Math.max(1, y1 - y0);
-      noise[y * W + x] = clamp(0.28 * n + 0.72 * top);
+      const top = clamp((y - ry0) / Math.max(1, ry1 - ry0));
+      noise[y * W + x] = clamp(0.18 * n + 0.82 * top);
     }
   }
-  const seeds: Dissolve['seeds'] = [];
+  // 光点只从身体（亮的黄色）上取，影子不发光
+  const seeds: Porch['seeds'] = [];
   let k = 0;
-  while (seeds.length < 5200 && k < 400000) {
+  while (seeds.length < 5200 && k < 600000) {
     k++;
     const x = Math.floor(lerp(x0, x1, random(`sx${k}`)));
     const y = Math.floor(lerp(y0, y1, random(`sy${k}`)));
     const i = y * W + x;
-    if (mask[i] < 0.5) continue;
-    seeds.push({
-      x, y,
-      r: bd.data[i * 4], g: bd.data[i * 4 + 1], b: bd.data[i * 4 + 2],
-      th: noise[i],
-      vx: 30 + 90 * random(`vx${k}`), vy: -(40 + 120 * random(`vy${k}`)),
-      s: 3 + 7 * random(`ss${k}`) ** 2,
-    });
+    if (mR[i] < 0.5) continue;
+    const R = bd.data[i * 4], G = bd.data[i * 4 + 1], B = bd.data[i * 4 + 2];
+    if (R + G + B < 3 * 70) continue;
+    seeds.push({x, y, r: R, g: G, b: B, th: noise[i], vx: 30 + 90 * random(`vx${k}`), vy: -(40 + 120 * random(`vy${k}`)), s: 3 + 7 * random(`ss${k}`) ** 2});
   }
   const work = document.createElement('canvas');
   work.width = W;
   work.height = H;
-  return {both: bd, mask, noise, box: [x0, y0, x1, y1], seeds, work};
+  const comp = document.createElement('canvas');
+  comp.width = W;
+  comp.height = H;
+  return {both, alone, bd, mR, mG, noise, box: [x0, y0, x1, y1], seeds, work, comp};
 }
 
-export const S07: React.FC<P> = ({t, shot, m}) => {
+export const S06: React.FC<P> = ({t, shot, m}) => {
   const p = p01(t, shot);
-  const d = useAsset('dissolve', () => prepDissolve(m));
-  const D0 = shot.from + 0.7, D1 = shot.from + 3.1;
+  const d = useAsset('porch', () => prepPorch(m));
+  const {D0, D1} = PORCH_DISSOLVE;
   const q = prog(t, D0, D1); // 消散进度
   const cool = ss(0, 1, prog(t, D0, D1 + 1.5));
+  const glow = ss(28.6, D0 + 0.4, t); // 第二句一开始，右边那只先微微发亮
+  const grade = `saturate(${lerp(1.06, 0.78, cool).toFixed(3)}) sepia(${lerp(0.12, 0.02, cool).toFixed(3)}) hue-rotate(${lerp(0, -8, cool).toFixed(2)}deg) brightness(${lerp(1, 0.94, cool).toFixed(3)}) contrast(1.03)`;
   return (
-    <AbsoluteFill style={kbTransform({s: [1.06, 1.1], oy: 0.6}, p)}>
-      <Plate src={m.s06.alone} filter={`saturate(${lerp(1.06, 0.78, cool)}) sepia(${lerp(0.12, 0.02, cool)}) hue-rotate(${lerp(0, -8, cool)}deg) brightness(${lerp(1, 0.94, cool)}) contrast(1.03)`} bloom={0.2} />
+    <AbsoluteFill style={kbTransform({s: [1.0, 1.1], oy: 0.6}, p)}>
+      <Canvas
+        ready={!!d}
+        deps={[t]}
+        style={{filter: grade}}
+        draw={ctx => {
+          if (!d) return;
+          const cc = d.comp.getContext('2d')!;
+          cc.clearRect(0, 0, W, H);
+          if (glow <= 0 && q <= 0) {
+            cc.drawImage(d.both, 0, 0, W, H);
+          } else {
+            cc.drawImage(d.alone, 0, 0, W, H);
+            const [x0, y0, x1, y1] = d.box;
+            const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+            const wc = d.work.getContext('2d')!;
+            const out = wc.createImageData(bw, bh);
+            const src = d.bd.data;
+            const shadowA = 1 - ss(0, 0.8, q);
+            for (let y = 0; y < bh; y++) {
+              for (let x = 0; x < bw; x++) {
+                const gi = (y + y0) * W + (x + x0);
+                const r = d.mR[gi], gg = d.mG[gi];
+                if (r <= 0.004 && gg <= 0.004) continue;
+                const th = d.noise[gi];
+                const keep = 1 - clamp((q * 1.08 - th) / 0.04 + 1);
+                const edge = q > 0 ? clamp(1 - Math.abs(q * 1.08 - th + 0.02) / 0.06) : 0;
+                // 只让黄色的身体发光：暗的门洞、偏蓝的白墙都不提亮，免得外圈亮出一道“抠图边”
+                const R0 = src[gi * 4], G0 = src[gi * 4 + 1], B0 = src[gi * 4 + 2];
+                const body = clamp(((R0 + G0) / 2 - B0 - 25) / 45) * clamp((R0 + G0 - 120) / 120);
+                const lit = (glow * 70 * body + 170 * edge * Math.max(body, 0.35)) * r;
+                const o = (y * bw + x) * 4;
+                out.data[o] = Math.min(255, src[gi * 4] + lit);
+                out.data[o + 1] = Math.min(255, src[gi * 4 + 1] + lit * 0.82);
+                out.data[o + 2] = Math.min(255, src[gi * 4 + 2] + lit * 0.45);
+                out.data[o + 3] = 255 * clamp(r * keep + gg * shadowA);
+              }
+            }
+            wc.clearRect(0, 0, W, H);
+            wc.putImageData(out, x0, y0);
+            cc.drawImage(d.work, 0, 0);
+          }
+          ctx.drawImage(d.comp, 0, 0);
+          // 柔光：和其它镜头的 Plate 一样，模糊后“滤色”叠一层
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = 0.2;
+          ctx.filter = 'blur(22px) brightness(1.15)';
+          ctx.drawImage(d.comp, 0, 0);
+          ctx.restore();
+        }}
+      />
       <Canvas
         ready={!!d}
         deps={[t]}
         draw={ctx => {
           if (!d) return;
-          const [x0, y0, x1, y1] = d.box;
-          const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
-          const wc = d.work.getContext('2d')!;
-          const out = wc.createImageData(bw, bh);
-          const src = d.both.data;
-          const glow = ss(shot.from, D0 + 0.4, t); // 散去之前先微微发亮
-          // 还没散掉的部分：原图（两只的版本）在 mask 里的像素；正在散的边缘烧成暖白
-          for (let y = 0; y < bh; y++) {
-            for (let x = 0; x < bw; x++) {
-              const gi = (y + y0) * W + (x + x0);
-              const mk = d.mask[gi];
-              if (mk <= 0.01) continue;
-              const th = d.noise[gi];
-              const keep = 1 - clamp((q * 1.08 - th) / 0.04 + 1);
-              if (keep <= 0) continue;
-              const edge = clamp(1 - Math.abs(q * 1.08 - th + 0.02) / 0.06) * (q > 0 ? 1 : 0);
-              const lit = glow * 70 + 170 * edge;
-              const o = (y * bw + x) * 4;
-              out.data[o] = Math.min(255, src[gi * 4] + lit);
-              out.data[o + 1] = Math.min(255, src[gi * 4 + 1] + lit * 0.82);
-              out.data[o + 2] = Math.min(255, src[gi * 4 + 2] + lit * 0.45);
-              out.data[o + 3] = 255 * mk * keep;
-            }
-          }
-          wc.clearRect(0, 0, W, H);
-          wc.putImageData(out, x0, y0);
-          ctx.drawImage(d.work, 0, 0);
           // 光点：被“释放”之后随晚风往右上飘，渐暗
-          const dot = glowDot('rgba(255,236,170,1)');
-          ctx.globalCompositeOperation = 'lighter';
-          const dur = 2.4;
-          for (const s of d.seeds) {
-            const rel = (q * 1.08 - s.th) / 1.08; // 释放后经过的进度
-            if (rel <= 0) continue;
-            const age = rel * (D1 - D0) + Math.max(0, t - D1);
-            if (age > dur) continue;
-            const life = age / dur;
-            const x = s.x + s.vx * age + 22 * Math.sin(age * 2 + s.y * 0.05);
-            const y = s.y + s.vy * age - 18 * age * age;
-            const a = (1 - life) ** 1.6 * 0.9;
-            ctx.globalAlpha = a;
-            const sz = s.s * (1 + life);
-            ctx.drawImage(dot, x - sz, y - sz, sz * 2, sz * 2);
-            ctx.globalAlpha = a * 0.8;
-            ctx.fillStyle = `rgb(${Math.min(255, s.r + 90)},${Math.min(255, s.g + 80)},${Math.min(255, s.b + 40)})`;
-            ctx.fillRect(x - 1, y - 1, 2, 2);
+          if (q > 0) {
+            const dot = glowDot('rgba(255,236,170,1)');
+            ctx.globalCompositeOperation = 'lighter';
+            const dur = 2.4;
+            for (const s of d.seeds) {
+              const rel = (q * 1.08 - s.th) / 1.08;
+              if (rel <= 0) continue;
+              const age = rel * (D1 - D0) + Math.max(0, t - D1);
+              if (age > dur) continue;
+              const life = age / dur;
+              const x = s.x + s.vx * age + 22 * Math.sin(age * 2 + s.y * 0.05);
+              const y = s.y + s.vy * age - 18 * age * age;
+              const a = (1 - life) ** 1.6 * 0.9;
+              const sz = s.s * (1 + life);
+              ctx.globalAlpha = a;
+              ctx.drawImage(dot, x - sz, y - sz, sz * 2, sz * 2);
+              ctx.globalAlpha = a * 0.8;
+              ctx.fillStyle = `rgb(${Math.min(255, s.r + 90)},${Math.min(255, s.g + 80)},${Math.min(255, s.b + 40)})`;
+              ctx.fillRect(x - 1, y - 1, 2, 2);
+            }
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
           }
-          ctx.globalAlpha = 1;
-          ctx.globalCompositeOperation = 'source-over';
           fireflies(ctx, t, 16, 'ff', [100, 120, 1000, 1500], lerp(0.85, 0.35, cool));
         }}
       />
@@ -323,23 +367,26 @@ export const S08: React.FC<P> = ({t, shot, m}) => {
 
 // ── 一个个夏天闪过：两只站在画面同一个位置（致敬原 PV 季节轮转） ──
 /** 每格停留多久：从一拍一换加速到 8fps 一换 */
-export function flickerIndex(t: number, shot: Shot, n: number) {
-  const start = shot.from;
+/** 闪切每一格的起点：一拍一换 ×3 → 半拍一换 ×4 → 之后 8fps 一换 */
+export function flickerHolds(from: number, to: number) {
   const holds: number[] = [];
-  let acc = start;
-  const beats = [1, 1, 1, 0.5, 0.5, 0.5, 0.5];
-  for (const b of beats) {
+  let acc = from;
+  for (const b of [1, 1, 1, 0.5, 0.5, 0.5, 0.5]) {
     holds.push(acc);
     acc += 0.6502 * b;
   }
-  while (acc < shot.to) {
+  while (acc < to) {
     holds.push(acc);
     acc += 0.125;
   }
+  return holds;
+}
+
+export function flickerIndex(t: number, shot: Shot, n: number) {
+  const holds = flickerHolds(shot.from, shot.to);
   let k = 0;
   for (let i = 0; i < holds.length; i++) if (t >= holds[i]) k = i;
-  const order = [0, 1, 2, 3, 4, 5, 6];
-  return {idx: order[k % n], k, t0: holds[k]};
+  return {idx: k % n, k, t0: holds[k]};
 }
 
 export const S09: React.FC<P> = ({t, shot, m}) => {
@@ -453,6 +500,6 @@ export const S14: React.FC<P> = ({t, shot, m}) => {
 };
 
 export const SHOT_COMPONENTS: Record<string, React.FC<P>> = {
-  s01: S01, s02: S02, s03: S03, s04: S04, s06: S06, s07: S07, s08: S08, s09: S09, s11a: S11a, s11b: S11b, s12: S12, s13: S13, s14: S14,
+  s01: S01, s01b: S01b, s02: S02, s03: S03, s04: S04, s06: S06, s08: S08, s09: S09, s11a: S11a, s11b: S11b, s12: S12, s13: S13, s14: S14,
 };
 

@@ -2,7 +2,8 @@ import '@fontsource/klee-one/600.css';
 import 'lxgw-wenkai-webfont/lxgwwenkai-regular.css';
 import React from 'react';
 import {AbsoluteFill, Audio, getStaticFiles, interpolate, staticFile, useVideoConfig} from 'remotion';
-import {FilmGrain, ss, useAsset, useT, Vignette, weave} from './fx';
+import {Canvas, FilmGrain, ss, useAsset, useT, Vignette, weave} from './fx';
+import {drawLyrics, zhStyle} from './lyricfx';
 import {Manifest, SHOT_COMPONENTS} from './shots';
 import {AUDIO_END, CUES, DURATION, FPS, SHOTS} from './timeline';
 
@@ -30,45 +31,21 @@ async function loadAll(): Promise<{m: Manifest; ly: Lyrics}> {
   return {m, ly};
 }
 
-/** 右侧竖排歌词：日文原词 + 中文翻译，一个字一个字浮现 */
+/** 右侧竖排歌词：日文原词逐字画在 canvas 上（每句一种特效，见 lyricfx.ts），中文翻译跟着做简化版 */
 const LyricColumn: React.FC<{t: number; ly: Lyrics}> = ({t, ly}) => {
-  const cue = CUES.find(c => t >= c.from && t < c.to);
-  if (!cue) return null;
-  const ja = ly.ja[cue.i] ?? '';
-  const zh = ly.zh?.[cue.i] ?? '';
-  const out = 1 - ss(cue.to - 0.12, cue.to, t);
-  const chars = [...ja];
-  const shadow = '0 0 16px rgba(0,0,0,0.6), 0 0 4px rgba(0,0,0,0.65)';
+  const j = CUES.findIndex(c => t >= c.from && t < c.to);
+  const cue = j >= 0 ? CUES[j] : null;
+  const zh = cue ? ly.zh?.[cue.i] ?? '' : '';
+  const zs = j >= 0 ? zhStyle(j, t) : null;
+  // 暗带：句子之间的空隙里也不急着消失，免得一闪一闪
+  const near = CUES.some(c => t >= c.from - 0.05 && t < c.to + 0.6);
+  const band = cue ? ss(cue.from, cue.from + 0.4, t) : near ? 1 : 0;
   return (
-    <AbsoluteFill style={{opacity: out}}>
-      <AbsoluteFill style={{background: 'linear-gradient(270deg, rgba(0,0,0,0.34) 0px, rgba(0,0,0,0.2) 170px, rgba(0,0,0,0) 330px)', opacity: ss(cue.from, cue.from + 0.4, t)}} />
-      <div style={{position: 'absolute', right: 58, top: 230, writingMode: 'vertical-rl', fontFamily: JA_FONT, fontWeight: 600, fontSize: 56, letterSpacing: '0.14em', color: '#fff', textShadow: shadow, lineHeight: 1}}>
-        {chars.map((ch, i) => {
-          const a = ss(cue.from + i * 0.045, cue.from + i * 0.045 + 0.4, t);
-          return (
-            <span key={i} style={{opacity: a, filter: `blur(${((1 - a) * 6).toFixed(2)}px)`, display: 'inline-block', transform: `translateY(${(1 - a) * -10}px)`}}>
-              {ch}
-            </span>
-          );
-        })}
-      </div>
-      {zh ? (
-        <div
-          style={{
-            position: 'absolute',
-            right: 140,
-            top: 262,
-            writingMode: 'vertical-rl',
-            fontFamily: ZH_FONT,
-            fontSize: 31,
-            letterSpacing: '0.18em',
-            color: 'rgba(255,255,255,0.86)',
-            textShadow: shadow,
-            opacity: ss(cue.from + 0.35, cue.from + 1.0, t),
-          }}
-        >
-          {zh}
-        </div>
+    <AbsoluteFill>
+      <AbsoluteFill style={{background: 'linear-gradient(270deg, rgba(0,0,0,0.34) 0px, rgba(0,0,0,0.2) 170px, rgba(0,0,0,0) 330px)', opacity: band}} />
+      <Canvas deps={[t]} draw={ctx => drawLyrics(ctx, t, ly.ja)} />
+      {zh && zs ? (
+        <div style={{position: 'absolute', right: 140, top: 262, writingMode: 'vertical-rl', fontFamily: ZH_FONT, fontSize: 31, letterSpacing: '0.18em', ...zs}}>{zh}</div>
       ) : null}
     </AbsoluteFill>
   );
