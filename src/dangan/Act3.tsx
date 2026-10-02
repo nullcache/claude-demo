@@ -1,7 +1,8 @@
 import React from 'react';
 import {P, TAU} from '../lib/math';
 import {BG, Svg} from './Act1';
-import {Cast, CastId, PixelSprite, RED_EYE} from './chars';
+import {Cast, CastId, PixelSprite} from './chars';
+import {RED_EYE, RED_EYE_CENTER} from './monokuma';
 import {b, backOut, C, clamp, E, expoIn, expoOut, F, H, lerp, noise1, prog, rng, W, win} from './core';
 import {bulletCracks, Glint, Halftone, line, poly, Rays, Txt, zigzag} from './ui';
 
@@ -318,8 +319,8 @@ export const S11Title: React.FC<{t: number}> = ({t}) => {
       {eye > 0 ? (
         <g>
           <g transform={`translate(1700 900) scale(${1.05 * expoOut(eye)})`}>
-            <path d={poly(RED_EYE.map(([x, y]) => [x - 136, y + 60] as P))} fill={C.red} filter="url(#s11glow)" opacity={0.7} />
-            <path d={poly(RED_EYE.map(([x, y]) => [x - 136, y + 60] as P))} fill={C.red} />
+            <path d={poly(RED_EYE.map(([x, y]) => [x - RED_EYE_CENTER[0], y - RED_EYE_CENTER[1]] as P))} fill={C.red} filter="url(#s11glow)" opacity={0.7} />
+            <path d={poly(RED_EYE.map(([x, y]) => [x - RED_EYE_CENTER[0], y - RED_EYE_CENTER[1]] as P))} fill="#C8102A" stroke="#4A0010" strokeWidth={6} />
           </g>
           <Glint x={1716} y={882} s={1.5 * eyeGlint} col="#FFD7DD" />
           <Txt x={1700} y={1000} size={56} font={F.pop} fill={C.pink} ls={8} opacity={expoOut(win(t, b(45.5), 0.2))}>

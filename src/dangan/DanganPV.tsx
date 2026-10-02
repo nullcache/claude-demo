@@ -1,5 +1,5 @@
 import React from 'react';
-import {AbsoluteFill, Audio, staticFile, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, Audio, getStaticFiles, staticFile, useCurrentFrame} from 'remotion';
 import {S1Split, S2Mono, S2Rules, S3Academy, S3Roster, S3Window, S4Body, S4Descent} from './Act1';
 import {S5Court, S6Debate, S7Bullet, S7Revolver, S7Shot, S8Wrong, S9Break} from './Act2';
 import {S10GameOver, S10Vote, S11Title} from './Act3';
@@ -7,6 +7,10 @@ import {b, C, clamp, expoIn, FLASH, FPS, H, prog, rng, shake, W} from './core';
 import {loadFonts} from './fonts';
 
 loadFonts();
+
+// 配乐由 scripts/dangan-audio.py 生成（素材许可原因不入库）；缺失时静音渲染
+const SCORE = 'dangan/score.m4a';
+const hasScore = () => getStaticFiles().some(f => f.name === SCORE);
 
 type Scene = [number, number, React.FC<{t: number}>];
 // [起始拍, 结束拍, 组件]：每个镜头只在自己的区间内渲染，剪辑点全部落在拍点
@@ -99,7 +103,7 @@ export const DanganPV: React.FC = () => {
   const active = SCENES.filter(([a, z]) => t >= b(a) - 1e-6 && t < b(z) - 1e-6);
   return (
     <AbsoluteFill style={{backgroundColor: '#000'}}>
-      <Audio src={staticFile('dangan/score.m4a')} />
+      {hasScore() ? <Audio src={staticFile(SCORE)} /> : null}
       <AbsoluteFill
         style={{
           transform: crt ? `scale(${Math.max(0.002, 1 - shrink)}, ${Math.max(0.003, 1 - squash)})` : undefined,

@@ -4,132 +4,6 @@ import {circleD, ribbonD, smoothD} from '../lib/shapes';
 import {C, lerp} from './core';
 import {poly} from './ui';
 
-// ═════════════ 黑白熊（致敬造型，原创矢量绘制） ═════════════
-// 局部坐标：头部中心 (0,0)，头宽约 600。观者左侧 = 白（希望），右侧 = 黑（绝望）。
-
-/** 头部轮廓（超椭圆，脸颊略宽） */
-export function headPts(): P[] {
-  const pts: P[] = [];
-  const n = 40;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    const c = Math.cos(a), s = Math.sin(a);
-    const k = 2.35;
-    const rx = 300 * (1 + 0.04 * Math.max(0, s)), ry = 252;
-    pts.push([Math.sign(c) * Math.pow(Math.abs(c), 2 / k) * rx, Math.sign(s) * Math.pow(Math.abs(s), 2 / k) * ry + 6 * s * s]);
-  }
-  return pts;
-}
-export const HEAD_D = smoothD(headPts());
-export const EARS: Array<[number, number, number]> = [
-  [-232, -208, 96],
-  [232, -208, 96],
-];
-/** 红眼：上缘平滑、下缘锯齿 */
-export const RED_EYE: P[] = [
-  [58, -46], [96, -76], [150, -96], [214, -94], [206, -66], [184, -78], [170, -44], [148, -66], [124, -26], [104, -54], [84, -30],
-];
-
-interface MonoProps {
-  x: number;
-  y: number;
-  s: number;
-  rot?: number;
-  /** 0..1：五官出现 */
-  face?: number;
-  /** 红眼辉光 */
-  glow?: number;
-  /** 笑：嘴张开程度 */
-  grin?: number;
-  sq?: number; // 挤压
-  outline?: boolean;
-  id?: string;
-}
-export const Monokuma: React.FC<MonoProps> = ({x, y, s, rot = 0, face = 1, glow = 0, grin = 0.4, sq = 0, outline = true, id = 'mk'}) => {
-  const WHITE = '#F8F7F5', BLACK = '#111014';
-  const clipL = `${id}-L`;
-  const g = grin;
-  // 嘴：白侧小弧，黑侧咧开的锯齿笑
-  const mouthTop: P[] = [[0, 98], [70, 86], [140, 58], [200, 18]];
-  const mouthBot: P[] = [[200, 18], [176, 92 + 40 * g], [110, 140 + 50 * g], [40, 136 + 30 * g], [0, 112 + 12 * g]];
-  const mouth = poly([...mouthTop, ...mouthBot]);
-  const teeth: P[][] = [];
-  for (let i = 0; i < 6; i++) {
-    const u0 = i / 6, u1 = (i + 1) / 6;
-    const A = lerpP(mouthTop, u0), B = lerpP(mouthTop, u1), M = lerpP(mouthTop, (u0 + u1) / 2);
-    teeth.push([A, B, [M[0] - 4, M[1] + 24 + 8 * g]]);
-  }
-  for (let i = 0; i < 5; i++) {
-    const u0 = 0.12 + (i / 5) * 0.8, u1 = 0.12 + ((i + 1) / 5) * 0.8;
-    const A = lerpP(mouthBot, u0), B = lerpP(mouthBot, u1), M = lerpP(mouthBot, (u0 + u1) / 2);
-    teeth.push([A, B, [M[0] + 4, M[1] - 22 - 6 * g]]);
-  }
-  return (
-    <g transform={`translate(${x} ${y}) rotate(${rot}) scale(${s * (1 + sq)} ${s * (1 - sq)})`}>
-      <defs>
-        <clipPath id={clipL}>
-          <rect x={-400} y={-400} width={400} height={800} />
-        </clipPath>
-      </defs>
-      {outline ? (
-        <g fill={C.ink} transform="scale(1.035)">
-          <path d={HEAD_D} />
-          {EARS.map(([ex, ey, er], i) => (
-            <path key={i} d={circleD(ex, ey, er + 4)} />
-          ))}
-        </g>
-      ) : null}
-      {/* 耳朵 */}
-      <path d={circleD(EARS[0][0], EARS[0][1], EARS[0][2])} fill={WHITE} />
-      <path d={circleD(EARS[0][0] + 10, EARS[0][1] + 10, 52)} fill="#D9D5DD" />
-      <path d={circleD(EARS[1][0], EARS[1][1], EARS[1][2])} fill={BLACK} />
-      <path d={circleD(EARS[1][0] - 10, EARS[1][1] + 10, 52)} fill="#2B2830" />
-      {/* 头：黑底 + 白色左半 */}
-      <path d={HEAD_D} fill={BLACK} />
-      <path d={HEAD_D} fill={WHITE} clipPath={`url(#${clipL})`} />
-      {face > 0 ? (
-        <g opacity={Math.min(1, face * 2)}>
-          {/* 口鼻部 */}
-          <ellipse cx={0} cy={72} rx={128} ry={94} fill={WHITE} />
-          <ellipse cx={0} cy={72} rx={128} ry={94} fill="#E9E6EC" clipPath={`url(#${clipL})`} opacity={0.6} />
-          {/* 白侧：小黑眼 */}
-          <ellipse cx={-126} cy={-42} rx={24} ry={31} fill={BLACK} />
-          <circle cx={-118} cy={-52} r={7} fill={WHITE} />
-          {/* 黑侧：咧嘴 */}
-          <path d={mouth} fill="#B0002A" />
-          {teeth.map((tt, i) => (
-            <path key={i} d={poly(tt)} fill={WHITE} />
-          ))}
-          <path d={mouth} fill="none" stroke={BLACK} strokeWidth={6} strokeLinejoin="round" />
-          {/* 白侧嘴 */}
-          <path d="M0 96Q-30 128 -70 108" fill="none" stroke={BLACK} strokeWidth={7} strokeLinecap="round" />
-          <path d="M0 60L0 98" stroke={BLACK} strokeWidth={7} />
-          {/* 鼻子 */}
-          <ellipse cx={0} cy={44} rx={38} ry={26} fill={BLACK} />
-          <ellipse cx={-12} cy={36} rx={11} ry={6} fill="#4A4752" />
-          {/* 红眼 */}
-          {glow > 0 ? <path d={poly(RED_EYE)} fill={C.red} opacity={0.55 * glow} filter="url(#mkGlow)" transform="scale(1.04)" /> : null}
-          <path d={poly(RED_EYE)} fill={C.red} />
-          <path d={poly(RED_EYE.slice(0, 5))} fill="#FF6B7D" opacity={0.6} transform="translate(0 6) scale(0.98)" />
-        </g>
-      ) : null}
-    </g>
-  );
-};
-function lerpP(pts: P[], u: number): P {
-  const x = u * (pts.length - 1);
-  const i = Math.min(pts.length - 2, Math.floor(x));
-  const k = x - i;
-  return [lerp(pts[i][0], pts[i + 1][0], k), lerp(pts[i][1], pts[i + 1][1], k)];
-}
-export const MonoDefs: React.FC = () => (
-  <defs>
-    <filter id="mkGlow" x="-100%" y="-100%" width="300%" height="300%">
-      <feGaussianBlur stdDeviation="14" />
-    </filter>
-  </defs>
-);
-
 // ═════════════ 学生剪影（半身） ═════════════
 // 局部坐标：头心 (0,-150)，肩线 y≈130，底边 y=420
 export type CastId = 'lucky' | 'idol' | 'detective' | 'gambler' | 'programmer' | 'biker' | 'heir' | 'despair';
@@ -238,22 +112,24 @@ export const Cast: React.FC<{id: CastId; x: number; y: number; s: number; fill?:
 
 // ═════════════ 像素黑白熊 / 像素犯人（GAME OVER 画面） ═════════════
 const MONO_PX = [
-  '..WW......KK....',
-  '.WWWW....KKKK...',
-  '.WWWWWWKKKKKK...',
-  '..WWWWWKKKKK....',
-  '.WWWWWWKKKKKK...',
-  '.WBWWWWKKRRRK...',
-  '.WWWWWWKKKKKK...',
-  '.WWWWBBBBKKKK...',
-  '..WWWWWWWWKK....',
-  '...WWWWKKKK.....',
-  '..WWWWWKKKKK....',
-  '.WWWWWWKKKKKK...',
-  '.WWWWWWKKKKKK...',
-  '..WWWWWKKKKK....',
-  '..WW.......KK...',
-  '................',
+  '..OO........OO..',
+  '.OWWO......OKKO.',
+  '.OWWWOOOOOOKKKO.',
+  '..OWWWWWKKKKKO..',
+  '.OWWWWWWKKKKKKO.',
+  '.OWWWWWWKKKKKKO.',
+  '.OWBWWWWKKKRRKO.',
+  '.OWBWWWWKKRRKKO.',
+  '.OWWWWBBBWKKKKO.',
+  '.OPWWWWBWWWKKKO.',
+  '.OWWWBBTUTUTUKO.',
+  '..OWWWWWWWKKKO..',
+  '...OOWWWKKKOO...',
+  '..OWWWWWKKKKKO..',
+  '.OWWWWWWWWWKKKO.',
+  '.OWWWWWWWWWKKKO.',
+  '..OWWWWWWWWKKO..',
+  '..OWWO...OKKO...',
 ];
 const PRISONER_PX = [
   '....KKKK........',
@@ -273,17 +149,21 @@ const PRISONER_PX = [
   '.KKKK..KKKK.....',
   '................',
 ];
-const PX_COL: Record<string, string> = {W: '#F4F4F4', K: '#1C1B22', R: C.red, B: '#111', S: '#F2C9A0', G: '#3A7D5C', N: '#2C3A63'};
+const PX_COL: Record<string, string> = {
+  W: '#F4F4F4', K: '#1C1B22', R: C.red, B: '#111', S: '#F2C9A0', G: '#3A7D5C', N: '#2C3A63',
+  O: '#5A5766', P: '#F4A6BC', T: '#FFFFFF', U: '#C9C6D2',
+};
 export const PixelSprite: React.FC<{which: 'mono' | 'prisoner'; x: number; y: number; px: number; frame?: number; flip?: boolean}> = ({which, x, y, px, frame = 0, flip}) => {
   const rows = which === 'mono' ? MONO_PX : PRISONER_PX;
   const rects: React.ReactNode[] = [];
+  const feet = rows.length - (rows[rows.length - 1].replace(/\./g, '') ? 1 : 2);
   rows.forEach((row, j) => {
-    // 走路动画：两帧交替抬脚
-    const legShift = j >= 13 && frame % 2 === 1 ? (row.indexOf('.') < 3 ? 1 : -1) : 0;
+    // 走路动画：脚所在行两帧交替错位
+    const shift = j === feet && frame % 2 === 1 ? 1 : 0;
     for (let i = 0; i < row.length; i++) {
       const ch = row[i];
       if (ch === '.') continue;
-      rects.push(<rect key={`${i}-${j}`} x={(i + (j >= 14 ? legShift : 0)) * px} y={j * px} width={px + 0.5} height={px + 0.5} fill={PX_COL[ch]} />);
+      rects.push(<rect key={`${i}-${j}`} x={(i + shift) * px} y={j * px} width={px + 0.5} height={px + 0.5} fill={PX_COL[ch]} />);
     }
   });
   return <g transform={`translate(${x} ${y}) scale(${flip ? -1 : 1} 1)`}>{rects}</g>;

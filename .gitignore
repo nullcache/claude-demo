@@ -1,2 +1,4 @@
 node_modules/
 out/
+.cache/
+public/dangan/score.m4a

@@ -1,7 +1,8 @@
 import React from 'react';
 import {P} from '../lib/math';
 import {circleD} from '../lib/shapes';
-import {Cast, CastId, EARS, HEAD_D, Monokuma, MonoDefs, RED_EYE} from './chars';
+import {Cast, CastId} from './chars';
+import {MonoDefs, Monokuma, MonoSilhouette, RED_EYE_CENTER} from './monokuma';
 import {b, backOut, C, clamp, E, expoIn, expoIO, expoOut, F, H, lerp, noise1, prog, rng, W, win} from './core';
 import {DialogueBox, Glint, Halftone, line, poly, Rays, SpeedLines, Splat, splatGeom, Txt, zigzag} from './ui';
 
@@ -46,8 +47,8 @@ export const SliceGlitch: React.FC<{id: string; amt: number; seed: number; n?: n
 // ═════════════ S1  希望 | 绝望 → 黑白熊（b0–b4） ═════════════
 const SEAM = zigzag(960, -60, 1140, 20, 60, 7);
 const seamLen = SEAM.reduce((s, p, i) => (i ? s + Math.hypot(p[0] - SEAM[i - 1][0], p[1] - SEAM[i - 1][1]) : 0), 0);
-const MONO_Y = 585;
-const MONO_S = 0.86;
+const MONO_Y = 452;
+const MONO_S = 0.84;
 const BIG = 5.2; // 拉远前：头部轮廓放大到覆盖整个画面
 
 export const S1Split: React.FC<{t: number}> = ({t}) => {
@@ -87,10 +88,7 @@ export const S1Split: React.FC<{t: number}> = ({t}) => {
       <MonoDefs />
       <defs>
         <clipPath id="s1head">
-          <path d={HEAD_D} transform={headT} />
-          {EARS.map(([ex, ey, er], i) => (
-            <path key={i} d={circleD(ex, ey, er)} transform={headT} />
-          ))}
+          <MonoSilhouette transform={headT} />
         </clipPath>
         <filter id="s1glow" x="-50%" y="-10%" width="200%" height="120%">
           <feGaussianBlur stdDeviation="10" />
@@ -99,11 +97,8 @@ export const S1Split: React.FC<{t: number}> = ({t}) => {
       {reveal ? <S2Backdrop t={t} k={zp} /> : <BG fill={C.ink} />}
       <g transform={world}>
         {reveal ? (
-          <g fill={C.ink} transform={`translate(960 ${MONO_Y}) scale(${BIG * 1.035})`}>
-            <path d={HEAD_D} />
-            {EARS.map(([ex, ey, er], i) => (
-              <path key={i} d={circleD(ex, ey, er + 4)} />
-            ))}
+          <g fill={C.ink} transform={`translate(960 ${MONO_Y}) scale(${BIG})`}>
+            <MonoSilhouette grow={18} />
           </g>
         ) : null}
         <g clipPath={reveal ? 'url(#s1head)' : undefined}>
@@ -150,7 +145,7 @@ export const S1Split: React.FC<{t: number}> = ({t}) => {
       {draw < 1 ? <Glint x={tip[0]} y={tip[1]} s={0.9} col={C.white} /> : null}
       {faceIn > 0 ? (
         <g opacity={faceIn}>
-          <Monokuma x={960} y={MONO_Y} s={MONO_S} face={1} grin={0.2} glow={0} />
+          <Monokuma x={960} y={MONO_Y} s={MONO_S} face={1} grin={0.2} glow={0} body />
         </g>
       ) : null}
     </Svg>
@@ -185,8 +180,7 @@ export const S2Mono: React.FC<{t: number}> = ({t}) => {
   const ph = (lt / eighth) % 1;
   const bounce = Math.pow(Math.sin(Math.PI * ph), 2);
   const eye = Math.exp(-Math.max(0, lt) / 0.18);
-  const r = RED_EYE.reduce((s, p) => [s[0] + p[0] / RED_EYE.length, s[1] + p[1] / RED_EYE.length], [0, 0]);
-  const ex = 960 + r[0] * MONO_S, ey = MONO_Y + r[1] * MONO_S;
+  const ex = 960 + RED_EYE_CENTER[0] * MONO_S, ey = MONO_Y - 18 * bounce + RED_EYE_CENTER[1] * MONO_S;
   const push = 1 + 0.06 * expoOut(prog(t, b(4), b(6)));
   return (
     <Svg>
@@ -194,7 +188,7 @@ export const S2Mono: React.FC<{t: number}> = ({t}) => {
       <S2Backdrop t={t} />
       <SpeedLines cx={960} cy={MONO_Y} t={t} n={60} inner={520} col={C.white} opacity={0.22} seed={4} width={10} />
       <g transform={`translate(960 ${MONO_Y}) scale(${push}) translate(-960 ${-MONO_Y})`}>
-        <Monokuma x={960} y={MONO_Y - 18 * bounce} s={MONO_S} sq={0.035 * bounce} rot={3 * Math.sin(lt * 15)} face={1} glow={0.6 + eye} grin={0.25 + 0.75 * bounce} />
+        <Monokuma x={960} y={MONO_Y - 18 * bounce} s={MONO_S} sq={0.035 * bounce} rot={3 * Math.sin(lt * 15)} face={1} glow={0.6 + eye} grin={0.25 + 0.75 * bounce} body />
         <Glint x={ex} y={ey} s={1.6 * eye + 0.25 * bounce} col="#FFE3E8" rot={lt * 40} />
       </g>
       {PUFFS.map(([x, y, rot, i]) => {

@@ -2,7 +2,8 @@ import React from 'react';
 import {P, TAU, V} from '../lib/math';
 import {ribbonD, smoothD} from '../lib/shapes';
 import {BG, SliceGlitch, Svg} from './Act1';
-import {Cast, CastId, Monokuma, MonoDefs} from './chars';
+import {Cast, CastId} from './chars';
+import {MonoDefs, Monokuma} from './monokuma';
 import {b, backOut, C, clamp, E, expoIn, expoOut, F, H, lerp, noise1, prog, rng, W, win} from './core';
 import {burstPts, Cracks, glassShards, Glint, Halftone, line, MBlur, poly, Rays, Reticle, Shard, SpeedLines, Txt} from './ui';
 
@@ -77,7 +78,7 @@ export const Court: React.FC<{t: number; cam: Cam; dim?: number}> = ({t, cam, di
       el: (
         <g key="throne">
           <path d={poly([[base.x - 160 * k, base.y], [base.x - 150 * k, top.y + 120 * k], [base.x, top.y], [base.x + 150 * k, top.y + 120 * k], [base.x + 160 * k, base.y]])} fill="#1A0B24" stroke={C.pink} strokeWidth={4 * k} />
-          <Monokuma x={base.x} y={project(cam, X, 470, Z).y} s={0.55 * k} face={1} glow={0.6} grin={0.5 + 0.3 * Math.sin(t * 9)} id="mkT" />
+          <Monokuma x={base.x} y={project(cam, X, 560, Z).y} s={0.42 * k} face={1} glow={0.6} grin={0.5 + 0.5 * Math.sin(t * 9)} body />
         </g>
       ),
     });
