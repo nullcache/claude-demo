@@ -192,7 +192,7 @@ async function prepDissolve(m: Manifest): Promise<Dissolve> {
     for (let x = x0; x <= x1; x++) {
       const n = 0.55 * vnoise(x, y, 70, 'n1') + 0.3 * vnoise(x, y, 24, 'n2') + 0.15 * vnoise(x, y, 8, 'n3');
       const top = (y - y0) / Math.max(1, y1 - y0);
-      noise[y * W + x] = clamp(0.62 * n + 0.38 * top);
+      noise[y * W + x] = clamp(0.28 * n + 0.72 * top);
     }
   }
   const seeds: Dissolve['seeds'] = [];
@@ -220,7 +220,7 @@ async function prepDissolve(m: Manifest): Promise<Dissolve> {
 export const S07: React.FC<P> = ({t, shot, m}) => {
   const p = p01(t, shot);
   const d = useAsset('dissolve', () => prepDissolve(m));
-  const D0 = shot.from + 0.35, D1 = shot.from + 2.6;
+  const D0 = shot.from + 0.7, D1 = shot.from + 3.1;
   const q = prog(t, D0, D1); // 消散进度
   const cool = ss(0, 1, prog(t, D0, D1 + 1.5));
   return (
@@ -236,6 +236,7 @@ export const S07: React.FC<P> = ({t, shot, m}) => {
           const wc = d.work.getContext('2d')!;
           const out = wc.createImageData(bw, bh);
           const src = d.both.data;
+          const glow = ss(shot.from, D0 + 0.4, t); // 散去之前先微微发亮
           // 还没散掉的部分：原图（两只的版本）在 mask 里的像素；正在散的边缘烧成暖白
           for (let y = 0; y < bh; y++) {
             for (let x = 0; x < bw; x++) {
@@ -245,11 +246,12 @@ export const S07: React.FC<P> = ({t, shot, m}) => {
               const th = d.noise[gi];
               const keep = 1 - clamp((q * 1.08 - th) / 0.04 + 1);
               if (keep <= 0) continue;
-              const edge = clamp(1 - Math.abs(q * 1.08 - th + 0.02) / 0.05) * (q > 0 ? 1 : 0);
+              const edge = clamp(1 - Math.abs(q * 1.08 - th + 0.02) / 0.06) * (q > 0 ? 1 : 0);
+              const lit = glow * 70 + 170 * edge;
               const o = (y * bw + x) * 4;
-              out.data[o] = Math.min(255, src[gi * 4] + 160 * edge);
-              out.data[o + 1] = Math.min(255, src[gi * 4 + 1] + 130 * edge);
-              out.data[o + 2] = Math.min(255, src[gi * 4 + 2] + 70 * edge);
+              out.data[o] = Math.min(255, src[gi * 4] + lit);
+              out.data[o + 1] = Math.min(255, src[gi * 4 + 1] + lit * 0.82);
+              out.data[o + 2] = Math.min(255, src[gi * 4 + 2] + lit * 0.45);
               out.data[o + 3] = 255 * mk * keep;
             }
           }
@@ -369,21 +371,23 @@ export const S11a: React.FC<P> = ({t, shot, m}) => {
 // ── 融化滴落 ──
 export const S11b: React.FC<P> = ({t, shot, m}) => {
   const p = p01(t, shot);
-  const melt = easeInOut(p) ** 1.4;
-  const scale = 10 + 360 * melt;
+  const melt = easeInOut(p) ** 1.3;
+  const scale = 8 + 210 * melt;
+  const EXT = 320;
   return (
     <AbsoluteFill style={kbTransform({s: [1.04, 1.0], oy: 0.4}, p)}>
       <svg width={0} height={0} style={{position: 'absolute'}}>
         <filter id="melt" x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.018 0.0009" numOctaves={2} seed={4} result="n" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.0065 0.00035" numOctaves={1} seed={7} result="n" />
           {/* R 固定 0.5（不左右偏），G 只取 0..0.5（只往下拖） */}
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.5  0 -0.5 0 0 0.5  0 0 0 0 0  0 0 0 0 1" result="d" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.5  0 -0.62 0 0 0.62  0 0 0 0 0  0 0 0 0 1" result="d" />
           <feDisplacementMap in="SourceGraphic" in2="d" scale={scale} xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </svg>
-      <AbsoluteFill style={{filter: 'url(#melt)'}}>
-        <Plate src={m.s11b.bg} filter={`saturate(${lerp(1, 0.7, p)}) contrast(1.05)`} bloom={0.25} />
-      </AbsoluteFill>
+      <div style={{position: 'absolute', left: 0, top: -EXT, width: W, height: H + EXT, filter: 'url(#melt)'}}>
+        <Img src={img(m.s11b.bg)} style={{position: 'absolute', left: 0, top: 0, width: W, height: H + EXT, objectFit: 'cover', objectPosition: '50% 100%', filter: `saturate(${lerp(1, 0.7, p)}) contrast(1.05)`}} />
+      </div>
+      <Img src={img(m.s11b.bg)} style={{position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(22px) brightness(1.15)', mixBlendMode: 'screen', opacity: 0.2}} />
       <AbsoluteFill style={{background: `linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(10,4,20,${0.5 * melt}) 100%)`}} />
     </AbsoluteFill>
   );

@@ -38,9 +38,10 @@ const LyricColumn: React.FC<{t: number; ly: Lyrics}> = ({t, ly}) => {
   const zh = ly.zh?.[cue.i] ?? '';
   const out = 1 - ss(cue.to - 0.12, cue.to, t);
   const chars = [...ja];
-  const shadow = '0 0 14px rgba(0,0,0,0.55), 0 0 3px rgba(0,0,0,0.6)';
+  const shadow = '0 0 16px rgba(0,0,0,0.6), 0 0 4px rgba(0,0,0,0.65)';
   return (
     <AbsoluteFill style={{opacity: out}}>
+      <AbsoluteFill style={{background: 'linear-gradient(270deg, rgba(0,0,0,0.34) 0px, rgba(0,0,0,0.2) 170px, rgba(0,0,0,0) 330px)', opacity: ss(cue.from, cue.from + 0.4, t)}} />
       <div style={{position: 'absolute', right: 58, top: 230, writingMode: 'vertical-rl', fontFamily: JA_FONT, fontWeight: 600, fontSize: 56, letterSpacing: '0.14em', color: '#fff', textShadow: shadow, lineHeight: 1}}>
         {chars.map((ch, i) => {
           const a = ss(cue.from + i * 0.045, cue.from + i * 0.045 + 0.4, t);
@@ -73,21 +74,23 @@ const LyricColumn: React.FC<{t: number; ly: Lyrics}> = ({t, ly}) => {
   );
 };
 
-/** 片尾：片名和署名 */
+/** 片尾：片名和署名（竖排放在左侧草丛的暗处，避开白色的幽灵） */
 const Title: React.FC<{t: number}> = ({t}) => {
   const a = ss(60.0, 61.2, t);
   const b = ss(60.8, 61.8, t);
   if (a <= 0) return null;
   return (
-    <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center'}}>
-      <AbsoluteFill style={{background: 'radial-gradient(ellipse 70% 30% at 50% 63%, rgba(0,0,0,0.55), rgba(0,0,0,0) 70%)', opacity: a}} />
-      <div style={{position: 'absolute', top: 1060, width: '100%', textAlign: 'center', opacity: a, filter: `blur(${((1 - a) * 8).toFixed(1)}px)`}}>
-        <div style={{fontFamily: JA_FONT, fontWeight: 600, fontSize: 132, letterSpacing: '0.42em', paddingLeft: '0.42em', color: '#fff', textShadow: '0 0 30px rgba(0,0,0,0.5)'}}>{TITLE}</div>
-        <div style={{marginTop: 26, fontFamily: ZH_FONT, fontSize: 30, letterSpacing: '0.5em', color: 'rgba(255,255,255,0.8)', opacity: b}}>奶娃 ver.</div>
+    <AbsoluteFill>
+      <AbsoluteFill style={{background: 'linear-gradient(90deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.25) 35%, rgba(0,0,0,0) 60%)', opacity: a}} />
+      <div style={{position: 'absolute', left: 120, top: 640, writingMode: 'vertical-rl', opacity: a, filter: `blur(${((1 - a) * 8).toFixed(1)}px)`}}>
+        <span style={{fontFamily: JA_FONT, fontWeight: 600, fontSize: 150, letterSpacing: '0.35em', color: '#fff', textShadow: '0 0 30px rgba(0,0,0,0.6)'}}>{TITLE}</span>
       </div>
-      <div style={{position: 'absolute', bottom: 170, width: '100%', textAlign: 'center', opacity: b * 0.75}}>
+      <div style={{position: 'absolute', left: 300, top: 700, writingMode: 'vertical-rl', fontFamily: ZH_FONT, fontSize: 30, letterSpacing: '0.5em', color: 'rgba(255,255,255,0.82)', textShadow: '0 0 10px rgba(0,0,0,0.7)', opacity: b}}>
+        奶娃 ver.
+      </div>
+      <div style={{position: 'absolute', left: 92, bottom: 150, opacity: b * 0.8}}>
         {CREDIT.map(c => (
-          <div key={c} style={{fontFamily: JA_FONT, fontWeight: 600, fontSize: 24, letterSpacing: '0.12em', color: '#fff', lineHeight: 1.9, textShadow: '0 0 8px rgba(0,0,0,0.6)'}}>
+          <div key={c} style={{fontFamily: JA_FONT, fontWeight: 600, fontSize: 21, letterSpacing: '0.08em', color: '#fff', lineHeight: 1.9, textShadow: '0 0 8px rgba(0,0,0,0.7)'}}>
             {c}
           </div>
         ))}
@@ -115,7 +118,7 @@ export const Shibetsu: React.FC = () => {
         </AbsoluteFill>
       ) : null}
       <Vignette amount={0.5} />
-      <FilmGrain t={t} amount={0.07} />
+      <FilmGrain t={t} amount={0.045} />
       {data ? <LyricColumn t={t} ly={data.ly} /> : null}
       <Title t={t} />
       <AbsoluteFill style={{backgroundColor: '#000', opacity: endFade}} />

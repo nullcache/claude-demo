@@ -5,7 +5,9 @@
     "studio": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts Promo out/zhumeng-lvfa.mp4",
     "sample": "remotion render src/index.ts Promo out/sample.mp4 --frames=0-179",
-    "still": "remotion still src/index.ts Promo"
+    "still": "remotion still src/index.ts Promo",
+    "shibetsu": "remotion render src/index.ts Shibetsu out/shibetsu.mp4",
+    "shibetsu:fetch": "node scripts/fetch-shibetsu.mjs"
   },
   "dependencies": {
     "@fontsource-variable/noto-serif-sc": "^5.3.0",
