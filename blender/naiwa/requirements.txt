@@ -1,0 +1,8 @@
+# Blender 作为 Python 模块运行（不用装 Blender 本体也能生成 .blend）
+bpy==4.5.14
+numpy==1.26.4        # bpy 4.5 需要 numpy<2
+scipy>=1.11
+scikit-image==0.24.0 # 和 numpy 1.26 兼容的版本
+pillow
+# 只有 silhouette.py（剪影比对）需要：
+# rembg[cpu]
