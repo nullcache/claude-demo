@@ -31,7 +31,7 @@ BELLY = '#D3B988'      # 奶油色肚皮
 HAND = '#54452A'       # 深橄榄棕的手
 TOE = '#47361F'        # 深棕色脚趾
 MOUTH_LINE = '#5E3D1F'
-IRIS = '#9CBF94'       # 灰绿虹膜
+IRIS = '#8DB088'       # 灰绿虹膜
 IRIS_RIM = '#5E7F5A'
 PUPIL = '#050505'
 
@@ -43,6 +43,8 @@ def mesh_from_sdf(voxel):
     t = time.time()
     xs, ys, zs, vol = shape.volume(voxel)
     print(f'SDF {vol.shape} {time.time() - t:.1f}s', flush=True)
+    # 网格点上的值恰好为 0 时 marching cubes 会生成零面积三角形（法线乱跳、渲染出小亮点），稍微挪开一点
+    vol = np.where(np.abs(vol) < 1e-7, 1e-7, vol)
     v, f, _, _ = marching_cubes(vol, level=0.0, spacing=(voxel, voxel, voxel))
     v = v + np.array([xs[0], ys[0], zs[0]])
     print(f'marching cubes: {len(v)} verts {len(f)} faces', flush=True)
@@ -57,6 +59,8 @@ def make_mesh(name, v, f):
     # 法线统一朝外（口腔形态键是沿法线往里推的，方向必须对）
     bm = bmesh.new()
     bm.from_mesh(me)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
+    bmesh.ops.dissolve_degenerate(bm, edges=bm.edges, dist=1e-7)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
     bm.free()
@@ -157,7 +161,7 @@ def skin_material():
     nt.links.new(rough.outputs['Result'], bs.inputs['Roughness'])
     bs.inputs['Subsurface Weight'].default_value = 0.5
     bs.inputs['Subsurface Radius'].default_value = (1.0, 0.45, 0.15)
-    bs.inputs['Subsurface Scale'].default_value = 0.03
+    bs.inputs['Subsurface Scale'].default_value = 0.016
     bs.inputs['Specular IOR Level'].default_value = 0.35
     # 很细的皮肤颗粒
     tc = node(nt, 'ShaderNodeTexCoord', -600, -400)
@@ -226,7 +230,7 @@ def make_mouth_line():
     center = pts.mean(axis=0)
     cu = bpy.data.curves.new('MouthLine', 'CURVE')
     cu.dimensions = '3D'
-    cu.bevel_depth = 0.0021
+    cu.bevel_depth = 0.0018
     cu.bevel_resolution = 3
     sp = cu.splines.new('POLY')
     sp.points.add(len(pts) - 1)
@@ -317,7 +321,7 @@ def studio(height=1.0):
     wn = w.node_tree
     bg = wn.nodes['Background']
     bg.inputs[0].default_value = srgb('#ffffff')
-    bg.inputs[1].default_value = 0.30
+    bg.inputs[1].default_value = 0.22
     # 相机直接看到的背景是浅灰白（和参考图一样），照明用的环境光弱一些
     bg2 = wn.nodes.new('ShaderNodeBackground')
     bg2.inputs[0].default_value = srgb('#ECECEC')
@@ -348,8 +352,8 @@ def studio(height=1.0):
         o.rotation_euler = (Vector((0, 0, 0.55 * height)) - o.location).to_track_quat('-Z', 'Y').to_euler()
         return o
 
-    area('Key', (-0.7, -2.6, 2.8), 112 * height ** 2, 3.0 * height)
-    area('Fill', (2.6, -2.4, 1.2), 14 * height ** 2, 4.0 * height)
+    area('Key', (-0.8, -2.3, 3.2), 125 * height ** 2, 2.6 * height)
+    area('Fill', (2.6, -2.4, 1.2), 10 * height ** 2, 4.0 * height)
     area('Rim', (0.8, 3.0, 2.6), 40 * height ** 2, 3.0 * height)
     cam = bpy.data.objects.new('Camera', bpy.data.cameras.new('Camera'))
     sc.collection.objects.link(cam)

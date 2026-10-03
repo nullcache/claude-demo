@@ -13,7 +13,6 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator
 
 # ── 身体 + 头：正面半宽 a(z) ───────────────────────────────────────────────────
-# 0.66 以下是躯干本身（手臂另算），以上就是正面剪影
 FRONT = np.array([
     # z      a
     [0.104, 0.000],
@@ -26,13 +25,16 @@ FRONT = np.array([
     [0.280, 0.273],
     [0.320, 0.282],
     [0.380, 0.287],
-    [0.440, 0.287],
-    [0.500, 0.281],
-    [0.560, 0.268],
-    [0.620, 0.247],
-    [0.680, 0.218],
-    [0.720, 0.193],
-    [0.760, 0.163],
+    [0.420, 0.284],
+    [0.460, 0.274],
+    [0.500, 0.258],
+    [0.540, 0.243],
+    [0.580, 0.222],
+    [0.620, 0.200],
+    [0.660, 0.188],
+    [0.700, 0.188],
+    [0.730, 0.179],
+    [0.760, 0.161],
     [0.800, 0.137],
     [0.840, 0.121],
     [0.880, 0.113],
@@ -44,6 +46,7 @@ FRONT = np.array([
     [0.997, 0.026],
     [1.000, 0.000],
 ])
+# 0.42 以上是躯干本身：手臂（粗胖的上臂、圆圆的肩头）挂在两侧，正面剪影 = 躯干 + 手臂
 
 # ── 侧面：前边界 yf、后边界 yb（模型坐标，负 = 往前）──────────────────────────────
 # 量自三视图侧面（脸朝右），去掉了凸出的眼睛、嘴尖和尾巴
@@ -219,17 +222,17 @@ def mirror(v, s):
 
 
 # ── 手臂（左臂 +X，右臂镜像）：从身体两侧垂下，上臂和身体融成一块 ─────────────────────
-SHOULDER, ELBOW, WRIST = np.array([0.198, 0.006, 0.636]), np.array([0.286, 0.000, 0.500]), np.array([0.316, -0.044, 0.410])
-R_SHOULDER, R_ELBOW, R_WRIST = 0.062, 0.057, 0.045
+SHOULDER, ELBOW, WRIST = np.array([0.208, -0.012, 0.640]), np.array([0.284, 0.045, 0.505]), np.array([0.316, -0.054, 0.410])
+R_SHOULDER, R_ELBOW, R_WRIST = 0.064, 0.056, 0.045
 # 手：深橄榄色的小手，掌心朝身体，三根短手指往下、指尖微微往外张，拇指在前
-PALM_C, PALM_R = np.array([0.326, -0.056, 0.372]), np.array([0.029, 0.035, 0.037])
+PALM_C, PALM_R = np.array([0.326, -0.066, 0.372]), np.array([0.029, 0.035, 0.037])
 FINGERS = [
     # (根部, 中段, 指尖, 半径)
-    (np.array([0.326, -0.080, 0.360]), np.array([0.330, -0.082, 0.338]), np.array([0.328, -0.080, 0.320]), 0.0128),
-    (np.array([0.328, -0.056, 0.354]), np.array([0.333, -0.056, 0.330]), np.array([0.331, -0.055, 0.313]), 0.0138),
-    (np.array([0.326, -0.032, 0.358]), np.array([0.330, -0.030, 0.336]), np.array([0.328, -0.030, 0.320]), 0.0128),
+    (np.array([0.326, -0.090, 0.360]), np.array([0.330, -0.092, 0.338]), np.array([0.328, -0.090, 0.320]), 0.0128),
+    (np.array([0.328, -0.066, 0.354]), np.array([0.333, -0.066, 0.330]), np.array([0.331, -0.065, 0.313]), 0.0138),
+    (np.array([0.326, -0.042, 0.358]), np.array([0.330, -0.040, 0.336]), np.array([0.328, -0.040, 0.320]), 0.0128),
 ]
-THUMB = (np.array([0.312, -0.086, 0.392]), np.array([0.304, -0.100, 0.376]), np.array([0.297, -0.103, 0.364]), 0.0122)
+THUMB = (np.array([0.312, -0.096, 0.392]), np.array([0.304, -0.110, 0.376]), np.array([0.297, -0.113, 0.364]), 0.0122)
 
 # ── 腿：粗短的柱子（横截面前后略长），脚就是柱子底部往前多一点 ─────────────────────────
 HIP, ANKLE = np.array([0.140, 0.010, 0.230]), np.array([0.140, 0.004, 0.050])
@@ -241,22 +244,21 @@ TOES = [(-0.054, 0.019), (0.0, 0.020), (0.054, 0.019)]  # (相对 x, 半径)
 TOE_Y, TOE_Z = -0.090, 0.016
 
 # ── 尾巴：从后腰往后伸出的粗短尾巴，尖端略微上翘 ────────────────────────────────────
-TAIL = [  # (中心, 半径)
-    (np.array([0.0, 0.150, 0.268]), 0.105),
-    (np.array([0.0, 0.290, 0.222]), 0.050),
-    (np.array([0.0, 0.374, 0.246]), 0.017),
+TAIL = [  # (中心, 半径)：根部很粗、从后腰平滑长出来的直锥形尾巴，尖端钝圆、微微上翘
+    (np.array([0.0, 0.150, 0.220]), 0.098),
+    (np.array([0.0, 0.360, 0.242]), 0.028),
 ]
-TAIL_SQUASH = 1.35  # 左右方向压扁一点（背面看是竖着的水滴形）
+TAIL_SQUASH = (1.28, 1.15)  # 左右、上下方向各压扁一点（横截面是扁一点的椭圆）
 
 # ── 脸 ─────────────────────────────────────────────────────────────────────────
 # 眼睛：贴在头顶前侧的圆盘（大球露出一小块球冠），虹膜灰绿、大黑瞳
 EYE_X, EYE_Z = 0.071, 0.923
-EYE_DISC = 0.033      # 露出来的圆盘半径
+EYE_DISC = 0.038      # 露出来的圆盘半径（含外圈深色环）
 EYE_BULGE = 0.0110    # 圆盘鼓出皮肤的高度（侧面也看得见）
 EYE_R = (EYE_DISC ** 2 + EYE_BULGE ** 2) / (2 * EYE_BULGE)  # 眼球半径
-PUPIL = 0.0190        # 瞳孔半径（在圆盘上量）
+PUPIL = 0.0205        # 瞳孔半径（在圆盘上量）
 MOUTH_Z = 0.858
-MOUTH_HALF = 0.042
+MOUTH_HALF = 0.040
 
 
 def torso_surface(x, z):
@@ -277,7 +279,7 @@ def head_surface(theta, z):
     return torso_surface(a * np.sin(theta), z)
 
 
-EYE_YAW = np.radians(30)  # 眼睛朝前偏外 30°（正面看圆盘宽:高 ≈ 0.89），视线水平
+EYE_YAW = np.radians(27)  # 眼睛朝前偏外 27°（正面看圆盘宽:高 ≈ 0.89），视线水平
 
 
 def eye_frame(side):
@@ -343,12 +345,13 @@ def parts(p, torso=None):
     d = {}
     body = sd_torso(p) if torso is None else torso
     # 两眼之间到嘴的一块微微隆起的“鼻梁”，嘴上方一个小小的尖（侧面看像鸟喙）
-    mz, _ = torso_surface(0.0, 0.888)
-    body = smin(body, sd_ellipsoid(p, mz + np.array([0, 0.018, 0]), (0.045, 0.020, 0.038)), 0.02)
+    # “嘴套”：两眼之间往下到嘴的一块往前凸的区域，两边脸颊往后收
+    mz, _ = torso_surface(0.0, 0.893)
+    body = smin(body, sd_ellipsoid(p, mz + np.array([0, 0.014, 0]), (0.048, 0.025, 0.036)), 0.02)
     # 嘴中间的小尖：从上唇往前下方伸出的一个小圆锥
-    bk, _ = torso_surface(0.0, MOUTH_Z + 0.010)
-    beak = sd_round_cone(p, bk + np.array([0, 0.006, 0.004]), bk + np.array([0, -0.009, -0.006]), 0.011, 0.0025)
-    body = smin(body, beak, 0.006)
+    bk, _ = torso_surface(0.0, MOUTH_Z + 0.013)
+    beak = sd_round_cone(p, bk + np.array([0, 0.004, 0.008]), bk + np.array([0, -0.016, -0.008]), 0.014, 0.0025)
+    body = smin(body, beak, 0.007)
     # 眼睛是单独的眼球物体，嵌在头里只露出一小块球冠，皮肤不用挖
     d['body'] = body
     for s, tag in ((1, 'L'), (-1, 'R')):
@@ -371,29 +374,36 @@ def parts(p, torso=None):
             c = mirror(FOOT_C, s) * np.array([1, 0, 0]) + np.array([dx * s, TOE_Y, TOE_Z])
             toes = np.minimum(toes, sd_ellipsoid(p, c, (rt, rt * 1.05, rt * 0.9)))
         d[f'toes.{tag}'] = toes
-    q = p * np.array([TAIL_SQUASH, 1, 1])
+    sx, sz = TAIL_SQUASH
+    zc = TAIL[0][0][2]
+    q = np.stack([p[:, 0] * sx, p[:, 1], (p[:, 2] - zc) * sz + zc], axis=1)
     tail = np.full(len(p), 1e9)
     for (c0, r0), (c1, r1) in zip(TAIL[:-1], TAIL[1:]):
-        tail = smin(tail, sd_round_cone(q, c0, c1, r0, r1), 0.02)
-    d['tail'] = tail / TAIL_SQUASH ** 0.5
+        c0q = np.array([c0[0], c0[1], (c0[2] - zc) * sz + zc])
+        c1q = np.array([c1[0], c1[1], (c1[2] - zc) * sz + zc])
+        tail = smin(tail, sd_round_cone(q, c0q, c1q, r0, r1), 0.02)
+    d['tail'] = tail / (sx * sz) ** 0.5
     return d
 
 
 def combine(d):
     """合成一整块皮。"""
-    total = smin(d['body'], d['tail'], 0.09)
+    # 尾巴上沿顺着后背平滑长出来，下沿轮廓清楚一点（背面看是一颗往下指的水滴）
+    p_ = d['_p']
+    k_tail = 0.028 + 0.05 * np.clip((p_[:, 2] - 0.20) / 0.12, 0, 1)
+    total = smin(d['body'], d['tail'], k_tail)
     for tag in ('L', 'R'):
         arm = smin(d[f'upperarm.{tag}'], d[f'forearm.{tag}'], 0.02)
         arm = smin(arm, d[f'hand.{tag}'], 0.010)
-        # 肩膀处和身体融得很软，往下（上臂内侧起）留一道清楚的折痕
+        # 肩头和身体融得很软（圆圆的一包），往下整条手臂和身体之间留一道深折缝
         p_ = d['_p']
-        k_arm = 0.008 + 0.034 * np.clip((p_[:, 2] - 0.60) / 0.08, 0, 1)
+        k_arm = 0.005 + 0.048 * np.clip((p_[:, 2] - 0.60) / 0.10, 0, 1) ** 1.5
         total = smin(total, arm, k_arm)
         leg = smin(d[f'leg.{tag}'], d[f'foot.{tag}'], 0.03)
         leg = smin(leg, d[f'toes.{tag}'], 0.004)
-        # 大腿外侧和肚子下沿融软，裆下面的拱形保持清楚
+        # 大腿外侧和肚子下沿稍微融软一点（肚子像个球垂在腿上，留一点折痕），裆下面的拱形保持清楚
         outer = np.clip((np.abs(p_[:, 0]) - 0.07) / 0.08, 0, 1)
-        total = smin(total, leg, 0.016 + 0.04 * outer)
+        total = smin(total, leg, 0.014 + 0.026 * outer)
     return total
 
 
