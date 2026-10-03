@@ -26,40 +26,25 @@ def srgb(h):
     return tuple((x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4) for x in c) + (1.0,)
 
 
-SKIN = '#F5BF1F'
-BELLY = '#E8C688'
-GREY = '#6B6650'
-MOUTH_LINE = '#5A3A1E'
-IRIS = '#8CC98B'
-IRIS_RIM = '#2F5A2E'
-PUPIL = '#080808'
+SKIN = '#DEB04E'       # 暖黄（哑光）
+BELLY = '#D3B988'      # 奶油色肚皮
+HAND = '#54452A'       # 深橄榄棕的手
+TOE = '#47361F'        # 深棕色脚趾
+MOUTH_LINE = '#5E3D1F'
+IRIS = '#9CBF94'       # 灰绿虹膜
+IRIS_RIM = '#5E7F5A'
+PUPIL = '#050505'
 
 
 # ───────────────────────── 网格 ─────────────────────────
 
 def mesh_from_sdf(voxel):
-    from scipy.ndimage import gaussian_filter1d
     from skimage.measure import marching_cubes
-    b = shape.BOUNDS
-    xs = np.arange(b[0, 0], b[0, 1] + voxel, voxel)
-    ys = np.arange(b[1, 0], b[1, 1] + voxel, voxel)
-    zs = np.arange(b[2, 0], b[2, 1] + voxel, voxel)
-    vol = np.empty((len(xs), len(ys), len(zs)), np.float32)
-    X, Y = np.meshgrid(xs, ys, indexing='ij')
     t = time.time()
-    # 先算身体主干，沿 z 方向高斯模糊（σ≈6mm）抹掉叠层椭球之间的细横纹，再和四肢、眼眶合成
-    loft = np.empty_like(vol)
-    for k, z in enumerate(zs):
-        P = np.stack([X.ravel(), Y.ravel(), np.full(X.size, z)], axis=1)
-        loft[:, :, k] = shape.body_loft(P).reshape(X.shape)
-    loft = gaussian_filter1d(loft, sigma=0.006 / voxel, axis=2, mode='nearest')
-    for k, z in enumerate(zs):
-        P = np.stack([X.ravel(), Y.ravel(), np.full(X.size, z)], axis=1)
-        d, _ = shape.sdf(P, loft[:, :, k].ravel())
-        vol[:, :, k] = d.reshape(X.shape)
+    xs, ys, zs, vol = shape.volume(voxel)
     print(f'SDF {vol.shape} {time.time() - t:.1f}s', flush=True)
     v, f, _, _ = marching_cubes(vol, level=0.0, spacing=(voxel, voxel, voxel))
-    v = v + b[:, 0]
+    v = v + np.array([xs[0], ys[0], zs[0]])
     print(f'marching cubes: {len(v)} verts {len(f)} faces', flush=True)
     return v, f
 
@@ -95,24 +80,33 @@ def decimate(ob, target_faces):
 
 
 def masks(ob):
-    """颜色属性：R = 肚皮，G = 灰色手脚，B = 嘴缝。"""
+    """颜色属性：R = 肚皮，G = 深色的手，B = 深色脚趾。"""
     me = ob.data
     P = np.array([v.co[:] for v in me.vertices])
     d = shape.parts(P)
-    rest = np.minimum.reduce([d['body']] + [d[k] for k in d if k.startswith(('upperarm', 'forearm', 'leg'))])
-    hf = np.minimum.reduce([d[k] for k in d if k.startswith(('hand', 'foot'))])
-    grey = 1 / (1 + np.exp(-(rest - hf) / 0.0025))
-    # 肚皮：从正面投影的椭圆，只在身体正面
     x, y, z = P.T
-    a, c, r = shape.profile(z)
-    e = (x / 0.226) ** 2 + ((z - 0.448) / 0.180) ** 2
-    belly = np.clip((1.03 - e) / 0.06, 0, 1)
+    # 手：腕部往上有一小段渐变
+    rest = np.minimum.reduce([d['body'], d['tail']] + [d[k] for k in d if k.startswith(('upperarm', 'forearm', 'leg', 'foot'))])
+    hand = np.minimum.reduce([d[k] for k in d if k.startswith('hand')])
+    wrist_z = shape.WRIST[2] + 0.012
+    hand_c = 1 / (1 + np.exp(-(rest - hand) / 0.004))
+    fore = np.minimum.reduce([d[k] for k in d if k.startswith('forearm')])
+    on_fore = 1 / (1 + np.exp(-(np.minimum(d['body'], d['tail']) - fore) / 0.003))
+    grad = np.clip((wrist_z + 0.03 - z) / 0.03, 0, 1)
+    dark = np.maximum(hand_c, grad * grad * (3 - 2 * grad) * on_fore)
+    toes = np.minimum.reduce([d[k] for k in d if k.startswith('toes')])
+    legs = np.minimum.reduce([d[k] for k in d if k.startswith(('leg', 'foot'))])
+    toe = 1 / (1 + np.exp(-(legs - toes) / 0.0015))
+    # 肚皮：从正面投影的椭圆，只在身体正面，边缘柔和
+    a, yc, ry = shape.profile(z)
+    e = (x / 0.272) ** 2 + ((z - 0.447) / 0.196) ** 2
+    belly = np.clip((1.10 - e) / 0.30, 0, 1)
     belly = belly * belly * (3 - 2 * belly)
-    front = np.clip((c - y) / (0.55 * np.maximum(r, 1e-3)), 0, 1)
+    front = np.clip((yc - y) / (0.25 * np.maximum(ry, 1e-3)), 0, 1)
     armness = np.minimum.reduce([d[k] for k in d if k.startswith(('upperarm', 'forearm', 'hand'))])
     on_body = np.clip((armness - d['body']) / 0.006 + 0.5, 0, 1)
-    belly = belly * front * on_body * (1 - grey)
-    col = np.stack([belly, grey, np.zeros_like(belly), np.ones_like(belly)], axis=1)
+    belly = belly * front * on_body * (1 - dark) * (1 - toe)
+    col = np.stack([belly, dark * (1 - toe), toe, np.ones_like(belly)], axis=1)
     attr = me.color_attributes.new('mask', 'FLOAT_COLOR', 'POINT')
     attr.data.foreach_set('color', col.astype(np.float32).ravel())
     return d
@@ -152,20 +146,19 @@ def skin_material():
         return n.outputs['Result']
 
     c = mix(sep.outputs[0], srgb(SKIN), srgb(BELLY), -150, 150)
-    c = mix(sep.outputs[1], c, srgb(GREY), 50, 100)
-    c = mix(sep.outputs[2], c, srgb(MOUTH_LINE), 250, 50)
+    c = mix(sep.outputs[1], c, srgb(HAND), 50, 100)
+    c = mix(sep.outputs[2], c, srgb(TOE), 250, 50)
     nt.links.new(c, bs.inputs['Base Color'])
     # 粗糙度：灰色手脚更哑
     rough = node(nt, 'ShaderNodeMapRange', 250, -200)
     nt.links.new(sep.outputs[1], rough.inputs['Value'])
-    rough.inputs['To Min'].default_value = 0.5
-    rough.inputs['To Max'].default_value = 0.72
+    rough.inputs['To Min'].default_value = 0.55
+    rough.inputs['To Max'].default_value = 0.65
     nt.links.new(rough.outputs['Result'], bs.inputs['Roughness'])
-    bs.inputs['Subsurface Weight'].default_value = 0.15
-    bs.inputs['Subsurface Radius'].default_value = (1.0, 0.8, 0.35)
+    bs.inputs['Subsurface Weight'].default_value = 0.5
+    bs.inputs['Subsurface Radius'].default_value = (1.0, 0.45, 0.15)
     bs.inputs['Subsurface Scale'].default_value = 0.03
-    bs.inputs['Sheen Weight'].default_value = 0.25
-    bs.inputs['Sheen Roughness'].default_value = 0.45
+    bs.inputs['Specular IOR Level'].default_value = 0.35
     # 很细的皮肤颗粒
     tc = node(nt, 'ShaderNodeTexCoord', -600, -400)
     nz = node(nt, 'ShaderNodeTexNoise', -400, -400)
@@ -173,7 +166,7 @@ def skin_material():
     nz.inputs['Detail'].default_value = 3.0
     nt.links.new(tc.outputs['Object'], nz.inputs['Vector'])
     bump = node(nt, 'ShaderNodeBump', 300, -400)
-    bump.inputs['Strength'].default_value = 0.05
+    bump.inputs['Strength'].default_value = 0.02
     bump.inputs['Distance'].default_value = 0.002
     nt.links.new(nz.outputs['Fac'], bump.inputs['Height'])
     nt.links.new(bump.outputs['Normal'], bs.inputs['Normal'])
@@ -181,40 +174,49 @@ def skin_material():
 
 
 def eye_material():
-    """眼球：沿局部 -Y 看出去，中心黑瞳 → 浅绿虹膜 → 深绿描边。"""
+    """眼睛圆盘：UV 中心 = 圆盘中心，半径 0.5 = 圆盘边缘。大黑瞳（略偏下）+ 灰绿虹膜，外圈深一点。"""
     m = bpy.data.materials.new('NaiwaEye')
     m.use_nodes = True
     nt = m.node_tree
     nt.nodes.clear()
-    out = node(nt, 'ShaderNodeOutputMaterial', 900, 0)
-    bs = node(nt, 'ShaderNodeBsdfPrincipled', 600, 0)
+    out = node(nt, 'ShaderNodeOutputMaterial', 1100, 0)
+    bs = node(nt, 'ShaderNodeBsdfPrincipled', 800, 0)
     nt.links.new(bs.outputs[0], out.inputs[0])
-    tc = node(nt, 'ShaderNodeTexCoord', -800, 0)
-    sep = node(nt, 'ShaderNodeSeparateXYZ', -600, 0)
-    nt.links.new(tc.outputs['Object'], sep.inputs[0])
-    # 与 -Y 的夹角：cos = -y / |p|（球半径 1）
-    neg = node(nt, 'ShaderNodeMath', -400, 0, operation='MULTIPLY')
-    nt.links.new(sep.outputs['Y'], neg.inputs[0])
-    neg.inputs[1].default_value = -1.0
-    ramp = node(nt, 'ShaderNodeValToRGB', -150, 0)
-    nt.links.new(neg.outputs[0], ramp.inputs['Fac'])
-    cr = ramp.color_ramp
-    cr.interpolation = 'EASE'
-    cr.elements[0].position = 0.30
-    cr.elements[0].color = srgb(IRIS_RIM)
-    cr.elements[1].position = 0.40
-    cr.elements[1].color = srgb('#6FB46E')
-    e = cr.elements.new(0.62)
-    e.color = srgb(IRIS)
-    e = cr.elements.new(0.885)
-    e.color = srgb('#A6DAA2')
-    e = cr.elements.new(0.90)
-    e.color = srgb(PUPIL)
-    nt.links.new(ramp.outputs['Color'], bs.inputs['Base Color'])
-    bs.inputs['Roughness'].default_value = 0.35
+    uv = node(nt, 'ShaderNodeUVMap', -900, 0)
+    sub = node(nt, 'ShaderNodeVectorMath', -700, 0, operation='SUBTRACT')
+    nt.links.new(uv.outputs['UV'], sub.inputs[0])
+    sub.inputs[1].default_value = (0.5, 0.5, 0.0)
+    ln = node(nt, 'ShaderNodeVectorMath', -500, 100, operation='LENGTH')
+    nt.links.new(sub.outputs[0], ln.inputs[0])
+    sub2 = node(nt, 'ShaderNodeVectorMath', -500, -100, operation='SUBTRACT')
+    nt.links.new(sub.outputs[0], sub2.inputs[0])
+    sub2.inputs[1].default_value = (-0.08, -0.10, 0.0)  # 瞳孔中心比圆盘中心低 0.2R、往鼻梁一侧 0.16R
+    ln2 = node(nt, 'ShaderNodeVectorMath', -300, -100, operation='LENGTH')
+    nt.links.new(sub2.outputs[0], ln2.inputs[0])
+    iris = node(nt, 'ShaderNodeValToRGB', -100, 150)
+    nt.links.new(ln.outputs['Value'], iris.inputs['Fac'])
+    cr = iris.color_ramp
+    cr.elements[0].position = 0.36
+    cr.elements[0].color = srgb(IRIS)
+    cr.elements[1].position = 0.50
+    cr.elements[1].color = srgb(IRIS_RIM)
+    pup = node(nt, 'ShaderNodeMapRange', -100, -150)
+    nt.links.new(ln2.outputs['Value'], pup.inputs['Value'])
+    r = shape.PUPIL / shape.EYE_DISC * 0.5
+    pup.inputs['From Min'].default_value = r - 0.012
+    pup.inputs['From Max'].default_value = r + 0.006
+    pup.inputs['To Min'].default_value = 1.0
+    pup.inputs['To Max'].default_value = 0.0
+    mx = node(nt, 'ShaderNodeMix', 300, 0)
+    mx.data_type = 'RGBA'
+    nt.links.new(pup.outputs['Result'], mx.inputs['Factor'])
+    nt.links.new(iris.outputs['Color'], mx.inputs['A'])
+    mx.inputs['B'].default_value = srgb(PUPIL)
+    nt.links.new(mx.outputs['Result'], bs.inputs['Base Color'])
+    bs.inputs['Roughness'].default_value = 0.45
     bs.inputs['Specular IOR Level'].default_value = 0.3
-    bs.inputs['Coat Weight'].default_value = 0.45
-    bs.inputs['Coat Roughness'].default_value = 0.08
+    bs.inputs['Coat Weight'].default_value = 0.08
+    bs.inputs['Coat Roughness'].default_value = 0.3
     return m
 
 
@@ -224,13 +226,12 @@ def make_mouth_line():
     center = pts.mean(axis=0)
     cu = bpy.data.curves.new('MouthLine', 'CURVE')
     cu.dimensions = '3D'
-    cu.bevel_depth = 0.0036
+    cu.bevel_depth = 0.0021
     cu.bevel_resolution = 3
     sp = cu.splines.new('POLY')
     sp.points.add(len(pts) - 1)
     for i, p in enumerate(pts):
-        _, n = shape.head_surface(0.0, p[2])
-        sp.points[i].co = (*(p - center - n * 0.0004), 1.0)
+        sp.points[i].co = (*(p - center), 1.0)
     ob = bpy.data.objects.new('MouthLine', cu)
     bpy.context.scene.collection.objects.link(ob)
     ob.location = center
@@ -243,23 +244,58 @@ def make_mouth_line():
 
 
 def make_eyes(mat, scale=1.0):
-    import bmesh
+    """眼睛：贴着头皮长出来的一片“镜片”。圆盘内往外鼓 EYE_BULGE，圆盘外沉到皮下，所以边缘和皮肤严丝合缝。"""
     eyes = []
+    R = shape.EYE_DISC
+    nr, nt_ = 26, 72
+    rs = np.concatenate([np.linspace(0, 1, 20), np.linspace(1, 1.25, nr - 20 + 1)[1:]]) * R
+    th = np.linspace(0, 2 * np.pi, nt_, endpoint=False)
     for s, tag in ((1, 'L'), (-1, 'R')):
+        pt, w = shape.eye_frame(s)
+        pt = pt + w * (shape.EYE_R - shape.EYE_BULGE)  # 圆盘中心在皮肤上
+        u = np.cross([0.0, 0.0, 1.0], w)
+        u /= np.linalg.norm(u)
+        v = np.cross(w, u)
+        rr, tt = np.meshgrid(rs[1:], th, indexing='ij')
+        rr = np.concatenate([[0.0], rr.ravel()])
+        tt = np.concatenate([[0.0], tt.ravel()])
+        q = pt + np.outer(rr * np.cos(tt), u) + np.outer(rr * np.sin(tt), v)
+        # 沿视线方向投到皮肤上
+        t = np.zeros(len(q))
+        for _ in range(6):
+            p = q + np.outer(t, w)
+            d = shape.sdf(p)[0]
+            e = 1e-4
+            dd = (shape.sdf(p + w * e)[0] - d) / e
+            t = t - d / np.clip(dd, 0.25, None)
+        x = rr / R
+        bulge = np.where(x < 1, shape.EYE_BULGE * np.clip(1 - x * x, 0, 1) ** 0.6, -0.0006 - 0.006 * (x - 1) / 0.25)
+        P = q + np.outer(t + bulge, w)
+        faces = []
+        for j in range(nt_):
+            faces.append((0, 1 + j, 1 + (j + 1) % nt_))
+        for i in range(len(rs) - 2):
+            for j in range(nt_):
+                a = 1 + i * nt_ + j
+                b = 1 + i * nt_ + (j + 1) % nt_
+                faces.append((a, a + nt_, b + nt_, b))
         me = bpy.data.meshes.new(f'Eye.{tag}')
-        bm = bmesh.new()
-        bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=24, radius=1.0)
-        for fc in bm.faces:
-            fc.smooth = True
-        bm.to_mesh(me)
-        bm.free()
+        me.from_pydata((P - pt).tolist(), [], faces)
+        me.update()
+        uvl = me.uv_layers.new(name='UVMap')
+        uvx = 0.5 + 0.5 * x * np.cos(tt) * s
+        uvy = 0.5 + 0.5 * x * np.sin(tt)
+        for poly in me.polygons:
+            for li in poly.loop_indices:
+                vi = me.loops[li].vertex_index
+                uvl.data[li].uv = (uvx[vi], uvy[vi])
+        for poly in me.polygons:
+            poly.use_smooth = True
         ob = bpy.data.objects.new(f'Eye.{tag}', me)
         bpy.context.scene.collection.objects.link(ob)
+        ob.location = Vector(pt) * scale
+        ob.scale = (scale, scale, scale)
         ob.data.materials.append(mat)
-        c, look = shape.eye_frame(s)
-        # 局部 -Y 对准视线
-        rot = Vector((0, -1, 0)).rotation_difference(Vector(look)).to_matrix().to_4x4()
-        ob.matrix_world = Matrix.Translation(Vector(c) * scale) @ rot @ Matrix.Scale(shape.EYE_R * scale, 4)
         eyes.append(ob)
     return eyes
 
@@ -267,6 +303,7 @@ def make_eyes(mat, scale=1.0):
 # ───────────────────────── 场景（预览用） ─────────────────────────
 
 def studio(height=1.0):
+    """白色无缝背景 + 前上方的大柔光，和参考图的棚拍效果接近。"""
     sc = bpy.context.scene
     sc.render.engine = 'CYCLES'
     sc.cycles.device = 'CPU'
@@ -277,16 +314,29 @@ def studio(height=1.0):
     w = bpy.data.worlds.new('World')
     sc.world = w
     w.use_nodes = True
-    w.node_tree.nodes['Background'].inputs[0].default_value = srgb('#ffffff')
-    w.node_tree.nodes['Background'].inputs[1].default_value = 0.22
-    bpy.ops.mesh.primitive_plane_add(size=30)
+    wn = w.node_tree
+    bg = wn.nodes['Background']
+    bg.inputs[0].default_value = srgb('#ffffff')
+    bg.inputs[1].default_value = 0.30
+    # 相机直接看到的背景是浅灰白（和参考图一样），照明用的环境光弱一些
+    bg2 = wn.nodes.new('ShaderNodeBackground')
+    bg2.inputs[0].default_value = srgb('#ECECEC')
+    bg2.inputs[1].default_value = 1.0
+    lp = wn.nodes.new('ShaderNodeLightPath')
+    mixs = wn.nodes.new('ShaderNodeMixShader')
+    wn.links.new(lp.outputs['Is Camera Ray'], mixs.inputs[0])
+    wn.links.new(bg.outputs[0], mixs.inputs[1])
+    wn.links.new(bg2.outputs[0], mixs.inputs[2])
+    wn.links.new(mixs.outputs[0], wn.nodes['World Output'].inputs[0])
+    bpy.ops.mesh.primitive_plane_add(size=40)
     floor = bpy.context.object
     floor.name = 'Floor'
     fm = bpy.data.materials.new('Floor')
     fm.use_nodes = True
-    fm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = srgb('#F1F0EC')
-    fm.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 0.9
+    fm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = srgb('#C9C8C4')
+    fm.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 1.0
     floor.data.materials.append(fm)
+    floor.is_shadow_catcher = True
 
     def area(name, loc, energy, size):
         l = bpy.data.lights.new(name, 'AREA')
@@ -298,9 +348,9 @@ def studio(height=1.0):
         o.rotation_euler = (Vector((0, 0, 0.55 * height)) - o.location).to_track_quat('-Z', 'Y').to_euler()
         return o
 
-    area('Key', (-2.2, -3.0, 3.2), 230 * height ** 2, 2.5 * height)
-    area('Fill', (3.0, -2.2, 1.6), 90 * height ** 2, 3.0 * height)
-    area('Rim', (1.2, 3.0, 2.6), 160 * height ** 2, 2.0 * height)
+    area('Key', (-0.7, -2.6, 2.8), 112 * height ** 2, 3.0 * height)
+    area('Fill', (2.6, -2.4, 1.2), 14 * height ** 2, 4.0 * height)
+    area('Rim', (0.8, 3.0, 2.6), 40 * height ** 2, 3.0 * height)
     cam = bpy.data.objects.new('Camera', bpy.data.cameras.new('Camera'))
     sc.collection.objects.link(cam)
     sc.camera = cam
@@ -347,12 +397,10 @@ if __name__ == '__main__':
     if args.preview:
         os.makedirs(args.preview, exist_ok=True)
         cam = studio()
-        # 正面；侧面从 +X 看过去（脸朝画面左边，和参考图「侧立」一致）；3/4
-        aim(cam, (0, -2.1, 0.52), (0, 0, 0.5), 50)
-        render(os.path.join(args.preview, 'front.png'))
-        aim(cam, (2.0, 0, 0.62), (0, 0, 0.5), 50)
-        render(os.path.join(args.preview, 'side.png'))
-        aim(cam, (1.25, -1.6, 0.78), (0, 0, 0.5), 50)
-        render(os.path.join(args.preview, 'three_quarter.png'))
+        # 和三视图一样的机位：正面、侧面（脸朝画面右边）、背面
+        for name, loc in (('front', (0, -3.4, 0.55)), ('side', (-3.4, 0, 0.55)), ('back', (0, 3.4, 0.55)),
+                          ('three_quarter', (-1.9, -2.8, 0.75))):
+            aim(cam, loc, (0, 0, 0.5), 85)
+            render(os.path.join(args.preview, f'{name}.png'), (720, 720), 32)
     if args.save:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(args.save))

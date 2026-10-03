@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import bpy  # noqa: E402
-from mathutils import Vector  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402
 
 import build  # noqa: E402
 
@@ -28,7 +28,7 @@ LABELS = {
 
 
 def rig():
-    return next(o for o in bpy.data.objects if o.type == 'ARMATURE')
+    return next((o for o in bpy.data.objects if o.type == 'ARMATURE'), None)
 
 
 def render_frames(outdir, frames, res, samples, per_frame=None):
@@ -96,7 +96,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
 
     # 每个动作：3/4 侧前方机位
-    for act in bpy.data.actions:
+    for act in bpy.data.actions if r is not None else []:
         if only and act.name not in only:
             continue
         r.animation_data.action = act
@@ -109,15 +109,23 @@ def main():
         render_frames(d, frames, a.res, a.samples)
         encode(d, os.path.join(a.out, f'{act.name}.mp4'))
 
-    # 转台：相机绕一圈，同时播待机
+    # 转台：相机绕一圈（有骨骼时同时播待机）
     if not only or 'Turntable' in only:
-        r.animation_data.action = bpy.data.actions['Idle']
+        if r is not None and 'Idle' in bpy.data.actions:
+            r.animation_data.action = bpy.data.actions['Idle']
         n = 96
 
+        bpy.context.view_layer.update()
+        lights = [o for o in bpy.data.objects if o.type == 'LIGHT']
+        base = {o.name: o.matrix_world.copy() for o in lights}
+
         def orbit(i, n):
+            # 相机绕一圈，灯组跟着相机转（每个角度都是正前上方打光）
             t = 2 * math.pi * i / n
-            dist = 2.3
-            build.aim(cam, (dist * math.sin(t), -dist * math.cos(t), 0.66), (0, 0, 0.55), 50)
+            dist = 3.4
+            build.aim(cam, (dist * math.sin(t), -dist * math.cos(t), 0.62), (0, 0, 0.5), 85)
+            for o in lights:
+                o.matrix_world = Matrix.Rotation(t, 4, 'Z') @ base[o.name]
 
         d = os.path.join(a.out, 'frames', 'Turntable')
         render_frames(d, [1 + i for i in range(n)], a.res, a.samples, orbit)

@@ -1,56 +1,162 @@
 """奶娃（网络 meme 里的“奶龙/奶蛙”）的形体定义：一个有向距离场（SDF）。
 
 所有尺寸以身高 = 1 归一化（脚底 z=0，头顶 z=1），角色面朝 -Y，角色的左手在 +X。
-比例从参考图量出来：
-  正面 laugh-gallery/奶蛙-静站绿眼.png（身宽、手臂、腿、脚、眼睛、嘴的位置）
-  侧面 emotes/奶蛙-侧立.png（前后厚度、头往前探、下巴下面的内收）——这张图的奶娃比正面那张胖，
-       厚度统一乘 0.8，让肚子处的厚度约为身宽的 1.1 倍（和 3/4 角度的图一致）
-身体是一串上下叠放、彼此平滑融合的椭球（每一层的宽/厚/前后偏移取自上面的轮廓），四肢是圆锥台，
-手指脚趾是胶囊/小球，眼眶是凸起的小球。
+比例从三张参考图逐行量出来（refs/ 下，按身高归一化、以两脚中点为中心）：
+  正面站姿            → 身体（含手臂）每个高度的宽度、腿、手、脚趾、眼睛、嘴的位置
+  三视图的侧面 / 背面   → 每个高度的前后边界（肚子、背、头往前探、下巴下的内收）、尾巴
+身体和头是一整块“放样”：每个高度的横截面是椭圆（半宽 a、中心 yc、前后半径 ry），
+三条曲线用 PCHIP 插值，头顶和身体底部各收成圆顶。手臂、腿是圆锥台，手指/脚趾是小球和胶囊。
 """
 from __future__ import annotations
 
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 
-# ── 轮廓（z, 半宽 a, 前后中心 c（负=往前）, 前后半径 r）──────────────────────
-PROFILE = np.array([
-    # z      a      c       r
-    [0.202, 0.000, 0.008, 0.000],
-    [0.208, 0.150, 0.008, 0.130],
-    [0.214, 0.210, 0.008, 0.180],
-    [0.228, 0.248, 0.006, 0.226],
-    [0.240, 0.258, 0.004, 0.252],
-    [0.268, 0.267, 0.002, 0.286],
-    [0.300, 0.272, 0.000, 0.302],
-    [0.350, 0.276, 0.002, 0.298],
-    [0.411, 0.274, 0.006, 0.286],
-    [0.471, 0.268, 0.011, 0.268],
-    [0.532, 0.258, 0.018, 0.244],
-    [0.592, 0.247, 0.024, 0.214],
-    [0.653, 0.232, 0.027, 0.182],
-    [0.713, 0.205, 0.028, 0.156],
-    [0.758, 0.176, 0.016, 0.148],
-    [0.804, 0.153, -0.004, 0.148],
-    [0.840, 0.143, -0.016, 0.144],
-    [0.880, 0.139, -0.030, 0.136],
-    [0.909, 0.134, -0.037, 0.128],
-    [0.940, 0.118, -0.042, 0.110],
-    [0.965, 0.092, -0.046, 0.086],
-    [0.985, 0.058, -0.050, 0.054],
-    [0.997, 0.020, -0.052, 0.020],
+# ── 身体 + 头：正面半宽 a(z) ───────────────────────────────────────────────────
+# 0.66 以下是躯干本身（手臂另算），以上就是正面剪影
+FRONT = np.array([
+    # z      a
+    [0.104, 0.000],
+    [0.112, 0.105],
+    [0.125, 0.160],
+    [0.145, 0.196],
+    [0.170, 0.218],
+    [0.200, 0.236],
+    [0.240, 0.258],
+    [0.280, 0.273],
+    [0.320, 0.282],
+    [0.380, 0.287],
+    [0.440, 0.287],
+    [0.500, 0.281],
+    [0.560, 0.268],
+    [0.620, 0.247],
+    [0.680, 0.218],
+    [0.720, 0.193],
+    [0.760, 0.163],
+    [0.800, 0.137],
+    [0.840, 0.121],
+    [0.880, 0.113],
+    [0.920, 0.106],
+    [0.945, 0.098],
+    [0.965, 0.083],
+    [0.980, 0.066],
+    [0.991, 0.046],
+    [0.997, 0.026],
+    [1.000, 0.000],
 ])
-_A = PchipInterpolator(PROFILE[:, 0], PROFILE[:, 1], extrapolate=False)
-_C = PchipInterpolator(PROFILE[:, 0], PROFILE[:, 2], extrapolate=False)
-_R = PchipInterpolator(PROFILE[:, 0], PROFILE[:, 3], extrapolate=False)
+
+# ── 侧面：前边界 yf、后边界 yb（模型坐标，负 = 往前）──────────────────────────────
+# 量自三视图侧面（脸朝右），去掉了凸出的眼睛、嘴尖和尾巴
+SIDE = np.array([
+    # z      yf      yb
+    [0.104, -0.010, -0.010],
+    [0.112, -0.075, 0.060],
+    [0.125, -0.100, 0.100],
+    [0.145, -0.122, 0.140],
+    [0.170, -0.152, 0.180],
+    [0.200, -0.185, 0.214],
+    [0.240, -0.219, 0.243],
+    [0.280, -0.243, 0.258],
+    [0.320, -0.258, 0.262],
+    [0.360, -0.265, 0.254],
+    [0.400, -0.265, 0.245],
+    [0.440, -0.261, 0.238],
+    [0.480, -0.250, 0.227],
+    [0.520, -0.239, 0.219],
+    [0.560, -0.221, 0.208],
+    [0.600, -0.199, 0.199],
+    [0.640, -0.179, 0.188],
+    [0.680, -0.161, 0.176],
+    [0.720, -0.152, 0.159],
+    [0.760, -0.161, 0.139],
+    [0.800, -0.183, 0.112],
+    [0.840, -0.212, 0.080],
+    [0.880, -0.222, 0.042],
+    [0.920, -0.218, 0.009],
+    [0.945, -0.209, -0.008],
+    [0.965, -0.198, -0.027],
+    [0.980, -0.181, -0.042],
+    [0.991, -0.160, -0.065],
+    [0.997, -0.142, -0.085],
+    [1.000, -0.112, -0.112],
+])
+Z_BOT, Z_TOP = FRONT[0, 0], FRONT[-1, 0]
+
+
+def _smooth_curve(zs, vals, sigma=0.022, keep_lo=0.17, keep_hi=0.95):
+    """量出来的点有像素级噪声，直接插值会在每个点留下一道细棱。先密采样，再在中段做高斯平滑
+    （两端的圆顶保持原样），最后在密集点上重新插值。"""
+    from scipy.ndimage import gaussian_filter1d
+    raw = PchipInterpolator(zs, vals)
+    zd = np.linspace(zs[0], zs[-1], 1200)
+    vd = raw(zd)
+    sm = gaussian_filter1d(vd, sigma / (zd[1] - zd[0]), mode='nearest')
+    w = np.clip((zd - keep_lo) / 0.04, 0, 1) * np.clip((keep_hi - zd) / 0.03, 0, 1)
+    return PchipInterpolator(zd, vd * (1 - w) + sm * w, extrapolate=False)
+
+
+_A = _smooth_curve(FRONT[:, 0], FRONT[:, 1])
+_YF = _smooth_curve(SIDE[:, 0], SIDE[:, 1])
+_YB = _smooth_curve(SIDE[:, 0], SIDE[:, 2])
+_dA, _dYF, _dYB = _A.derivative(), _YF.derivative(), _YB.derivative()
 
 
 def profile(z):
-    z = np.asarray(z, dtype=np.float64)
+    """返回 (a, yc, ry)：该高度横截面椭圆的半宽、前后中心、前后半径。"""
+    z = np.clip(np.asarray(z, dtype=np.float64), Z_BOT, Z_TOP)
     a = np.nan_to_num(_A(z), nan=0.0)
-    c = np.nan_to_num(_C(np.clip(z, PROFILE[0, 0], PROFILE[-1, 0])), nan=0.0)
-    r = np.nan_to_num(_R(z), nan=0.0)
-    return a, c, r
+    yf, yb = np.nan_to_num(_YF(z), nan=0.0), np.nan_to_num(_YB(z), nan=0.0)
+    return a, (yf + yb) / 2, (yb - yf) / 2
+
+
+def face_power(z, front):
+    """横截面的“方度”：身体是椭圆（2），头的前半边略方（脸比较平，眼睛落在脸的两个前角上）。"""
+    w = np.clip((z - 0.74) / 0.10, 0, 1) * np.clip((0.995 - z) / 0.05, 0, 1)
+    return 2.0 + 0.55 * w * front
+
+
+def _rho(u, v, n):
+    au, av = np.abs(u) + 1e-12, np.abs(v) + 1e-12
+    r = (au ** n + av ** n) ** (1 / n)
+    du = np.sign(u) * au ** (n - 1) * r ** (1 - n)
+    dv = np.sign(v) * av ** (n - 1) * r ** (1 - n)
+    return r, du, dv
+
+
+def sd_torso(p):
+    """身体+头的距离：放样隐函数除以梯度长度（贴近表面时就是真实距离，远处只保证正负号）。"""
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    zc = np.clip(z, Z_BOT + 1e-4, Z_TOP - 1e-4)
+    a = np.maximum(_A(zc), 1e-4)
+    yf, yb = _YF(zc), _YB(zc)
+    yc, ry = (yf + yb) / 2, np.maximum((yb - yf) / 2, 1e-4)
+    da = _dA(zc)
+    dyc, dry = (_dYF(zc) + _dYB(zc)) / 2, (_dYB(zc) - _dYF(zc)) / 2
+    u, v = x / a, (y - yc) / ry
+    n = face_power(zc, (v < 0).astype(float))
+    rho, du, dv = _rho(u, v, n)
+    gx = du / a
+    gy = dv / ry
+    gz = du * (-u * da / a) + dv * (-(dyc + v * dry) / ry)
+    d = (rho - 1) / np.sqrt(gx * gx + gy * gy + gz * gz)
+    # 放样两端之外：到端点的距离
+    top = np.array([0.0, -0.112, Z_TOP])
+    bot = np.array([0.0, -0.010, Z_BOT])
+    d = np.where(z >= Z_TOP, np.linalg.norm(p - top, axis=1), d)
+    d = np.where(z <= Z_BOT, np.linalg.norm(p - bot, axis=1), d)
+    return d
+
+
+def torso_inside(p):
+    """只判断在不在身体里（建网格时配合距离变换用）。"""
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    a, yc, ry = profile(z)
+    ok = (z > Z_BOT) & (z < Z_TOP) & (a > 0) & (ry > 0)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        u, v = x / a, (y - yc) / ry
+        n = face_power(z, (v < 0).astype(float))
+        r = np.abs(u) ** n + np.abs(v) ** n
+    return ok & (r < 1)
 
 
 # ── SDF 基本体 ───────────────────────────────────────────────────────────────
@@ -96,7 +202,7 @@ def sd_round_cone(p, a, b, ra, rb):
     k = np.sign(rr) * rr * rr * x2
     out = np.empty(len(p))
     m1 = np.sign(z) * a2 * z2 > k
-    m2 = (~m1) & (np.sign(y) * a2 * y2 < k)
+    m2 = np.sign(y) * a2 * y2 < k
     m3 = ~(m1 | m2)
     out[m1] = np.sqrt(x2[m1] + z2[m1]) * il2 - rb
     out[m2] = np.sqrt(x2[m2] + y2[m2]) * il2 - ra
@@ -108,190 +214,227 @@ def sd_capsule(p, a, b, r):
     return sd_round_cone(p, a, b, r, r)
 
 
-def sd_polyline(p, pts, r):
-    d = np.full(len(p), 1e9)
-    for a, b in zip(pts[:-1], pts[1:]):
-        d = np.minimum(d, sd_capsule(p, a, b, r))
-    return d
-
-
-# ── 各部位 ───────────────────────────────────────────────────────────────────
-
 def mirror(v, s):
     return np.array([v[0] * s, v[1], v[2]])
 
 
-# 手臂：肩 → 肘 → 腕（左臂 +X，右臂镜像）
-SHOULDER, ELBOW, WRIST = np.array([0.196, 0.012, 0.628]), np.array([0.284, 0.002, 0.470]), np.array([0.292, -0.016, 0.348])
-R_SHOULDER, R_ELBOW, R_WRIST = 0.060, 0.056, 0.037
-# 手：掌心朝身体；三根手指往下、末端往里勾；拇指在前面
-PALM_C, PALM_R = np.array([0.294, -0.020, 0.310]), np.array([0.026, 0.040, 0.050])
+# ── 手臂（左臂 +X，右臂镜像）：从身体两侧垂下，上臂和身体融成一块 ─────────────────────
+SHOULDER, ELBOW, WRIST = np.array([0.198, 0.006, 0.636]), np.array([0.286, 0.000, 0.500]), np.array([0.316, -0.044, 0.410])
+R_SHOULDER, R_ELBOW, R_WRIST = 0.062, 0.057, 0.045
+# 手：深橄榄色的小手，掌心朝身体，三根短手指往下、指尖微微往外张，拇指在前
+PALM_C, PALM_R = np.array([0.326, -0.056, 0.372]), np.array([0.029, 0.035, 0.037])
 FINGERS = [
     # (根部, 中段, 指尖, 半径)
-    (np.array([0.293, -0.047, 0.280]), np.array([0.290, -0.050, 0.245]), np.array([0.272, -0.048, 0.226]), 0.0150),
-    (np.array([0.294, -0.020, 0.274]), np.array([0.291, -0.020, 0.236]), np.array([0.272, -0.019, 0.216]), 0.0160),
-    (np.array([0.293, 0.007, 0.278]), np.array([0.290, 0.009, 0.244]), np.array([0.273, 0.009, 0.226]), 0.0150),
+    (np.array([0.326, -0.080, 0.360]), np.array([0.330, -0.082, 0.338]), np.array([0.328, -0.080, 0.320]), 0.0128),
+    (np.array([0.328, -0.056, 0.354]), np.array([0.333, -0.056, 0.330]), np.array([0.331, -0.055, 0.313]), 0.0138),
+    (np.array([0.326, -0.032, 0.358]), np.array([0.330, -0.030, 0.336]), np.array([0.328, -0.030, 0.320]), 0.0128),
 ]
-THUMB = (np.array([0.283, -0.052, 0.330]), np.array([0.272, -0.072, 0.306]), np.array([0.261, -0.076, 0.290]), 0.0150)
+THUMB = (np.array([0.312, -0.086, 0.392]), np.array([0.304, -0.100, 0.376]), np.array([0.297, -0.103, 0.364]), 0.0122)
 
-# 腿：大腿根 → 脚踝
-HIP, ANKLE = np.array([0.138, 0.006, 0.250]), np.array([0.172, -0.004, 0.052])
-R_HIP, R_ANKLE = 0.100, 0.058
-# 脚：扁椭球 + 四个脚趾，往外撇 14°
-FOOT_C, FOOT_R, FOOT_YAW = np.array([0.190, -0.034, 0.020]), np.array([0.072, 0.088, 0.020]), np.radians(14)
-TOES = [(-0.051, 0.0195), (-0.017, 0.0215), (0.017, 0.0215), (0.051, 0.0195)]  # (相对 x, 半径)
+# ── 腿：粗短的柱子（横截面前后略长），脚就是柱子底部往前多一点 ─────────────────────────
+HIP, ANKLE = np.array([0.140, 0.010, 0.230]), np.array([0.140, 0.004, 0.050])
+R_HIP, R_ANKLE = 0.090, 0.080
+LEG_DEPTH = 1.20  # 前后半径 / 左右半径
+FOOT_C, FOOT_R, FOOT_YAW = np.array([0.140, -0.010, 0.030]), np.array([0.084, 0.092, 0.032]), 0.0
+# 脚趾：每只脚前沿三颗深棕色圆指甲
+TOES = [(-0.054, 0.019), (0.0, 0.020), (0.054, 0.019)]  # (相对 x, 半径)
+TOE_Y, TOE_Z = -0.090, 0.016
 
-# 眼睛：头部 z=0.915 处，偏离正前方 ±50°
-EYE_Z, EYE_ANGLE, EYE_R = 0.898, np.radians(42), 0.043
+# ── 尾巴：从后腰往后伸出的粗短尾巴，尖端略微上翘 ────────────────────────────────────
+TAIL = [  # (中心, 半径)
+    (np.array([0.0, 0.150, 0.268]), 0.105),
+    (np.array([0.0, 0.290, 0.222]), 0.050),
+    (np.array([0.0, 0.374, 0.246]), 0.017),
+]
+TAIL_SQUASH = 1.35  # 左右方向压扁一点（背面看是竖着的水滴形）
+
+# ── 脸 ─────────────────────────────────────────────────────────────────────────
+# 眼睛：贴在头顶前侧的圆盘（大球露出一小块球冠），虹膜灰绿、大黑瞳
+EYE_X, EYE_Z = 0.071, 0.923
+EYE_DISC = 0.033      # 露出来的圆盘半径
+EYE_BULGE = 0.0110    # 圆盘鼓出皮肤的高度（侧面也看得见）
+EYE_R = (EYE_DISC ** 2 + EYE_BULGE ** 2) / (2 * EYE_BULGE)  # 眼球半径
+PUPIL = 0.0190        # 瞳孔半径（在圆盘上量）
+MOUTH_Z = 0.858
+MOUTH_HALF = 0.042
+
+
+def torso_surface(x, z):
+    """身体正面（y 最小一侧）在 (x, z) 处的表面点和外法线。"""
+    a, yc, ry = (float(v) for v in profile(z))
+    t = np.clip(x / a, -0.999, 0.999)
+    n = float(face_power(z, 1.0))
+    y = yc - ry * (1 - abs(t) ** n) ** (1 / n)
+    p = np.array([[x, y, z]])
+    e = 1e-4
+    g = np.array([(sd_torso(p + d) - sd_torso(p - d))[0] for d in np.eye(3) * e]) / (2 * e)
+    return p[0], g / np.linalg.norm(g)
 
 
 def head_surface(theta, z):
-    """头部横截面上、偏离正前方 theta 的表面点和外法线。"""
-    a, c, r = (float(v) for v in profile(z))
-    x = a * np.sin(theta)
-    y = c - r * np.cos(theta)
-    n = np.array([np.sin(theta) / a, -np.cos(theta) / r, 0.0])
-    return np.array([x, y, z]), n / np.linalg.norm(n)
+    """头部横截面上、偏离正前方 theta（弧度）的表面点和外法线（兼容旧接口）。"""
+    a, yc, ry = (float(v) for v in profile(z))
+    return torso_surface(a * np.sin(theta), z)
+
+
+EYE_YAW = np.radians(30)  # 眼睛朝前偏外 30°（正面看圆盘宽:高 ≈ 0.89），视线水平
 
 
 def eye_frame(side):
     """返回 (眼球中心, 视线方向)。side=+1 左眼（+X），-1 右眼。"""
-    pt, n = head_surface(EYE_ANGLE * side, EYE_Z)
-    n = n + np.array([0, 0, 0.06])
-    n /= np.linalg.norm(n)
-    center = pt + n * 0.007
-    look = n * 0.3 + np.array([0, -1.0, 0]) * 0.7
-    look /= np.linalg.norm(look)
-    return center, look
-
-
-MOUTH_Z = 0.832
+    pt, n = torso_surface(EYE_X * side, EYE_Z)
+    axis = np.array([np.sin(EYE_YAW) * side, -np.cos(EYE_YAW), 0.0])
+    center = pt + axis * (EYE_BULGE - EYE_R)
+    return center, axis
 
 
 def mouth_line():
-    """嘴：一道细细的线，嘴角往下勾一点。"""
+    """嘴：一道短短的细线，中间微微拱起，两头往下收。点落在真实表面上（含嘴上方的小尖）。"""
     pts = []
-    for u in np.linspace(-1, 1, 11):
-        theta = u * 0.42
-        pt, n = head_surface(theta, MOUTH_Z - 0.005 * u ** 4)
-        pts.append(pt - n * 0.002)
+    for u in np.linspace(-1, 1, 15):
+        z = MOUTH_Z + 0.006 * (1 - u ** 4)
+        pt, n = torso_surface(u * MOUTH_HALF, z)
+        # 沿法线找到合成后表面（parts 里加了鼻梁和小尖）
+        for _ in range(3):
+            d = sdf(pt[None])[0][0]
+            pt = pt - n * d
+        pts.append(pt - n * 0.0006)
     return np.array(pts)
 
 
-# 建模用 A-pose：手臂绕肩膀往外张开 ARM_ABDUCT，内侧有完整的皮；默认姿势再用骨骼放回身体两侧。
-# 上面量出来的手臂坐标都是“放下来”的位置，这里在求距离时把查询点反向转回去再算。
-ARM_ABDUCT = np.radians(30)
-ARM_PIVOT = np.array([0.175, 0.012, 0.640])
+# 手臂姿势：ARM_ABDUCT=0 时就是参考图的自然垂放
+ARM_ABDUCT = 0.0
+ARM_PIVOT = np.array([0.175, 0.004, 0.660])
 
 
 def arm_rot(s, angle=None):
-    """把“放下的手臂”转到 A-pose 的旋转（绕 Y 轴，左臂往 +X 张开）。"""
     a = ARM_ABDUCT if angle is None else angle
-    th = -a * s  # 左臂（s=+1）往外张开是绕 +Y 转负角
+    th = -a * s
     c, sn = np.cos(th), np.sin(th)
     return np.array([[c, 0, sn], [0, 1, 0], [-sn, 0, c]])
 
 
 def arm_to_apose(v, s):
-    """把放下手臂时的一个点（已镜像到 s 侧）转到 A-pose。"""
     pv = mirror(ARM_PIVOT, s)
     return arm_rot(s) @ (np.asarray(v) - pv) + pv
 
 
 def arm_query(p, s):
-    """把查询点从 A-pose 反向转回“手臂放下”的坐标系。"""
     pv = mirror(ARM_PIVOT, s)
-    R = arm_rot(s)
-    return (p - pv) @ R + pv  # 行向量乘 R 等于乘 R 的逆（R 是正交阵）
+    return (p - pv) @ arm_rot(s) + pv
 
 
-def foot_local(p, s):
-    c = mirror(FOOT_C, s)
-    q = p - c
-    yaw = FOOT_YAW * s
-    cs, sn = np.cos(-yaw), np.sin(-yaw)
-    x = q[:, 0] * cs - q[:, 1] * sn
-    y = q[:, 0] * sn + q[:, 1] * cs
-    return np.stack([x, y, q[:, 2]], axis=1)
+def sd_leg(p, s):
+    c = mirror(HIP, s)
+    q = p - np.array([c[0], 0.0, 0.0])
+    q = np.stack([q[:, 0], (q[:, 1] - c[1]) / LEG_DEPTH, q[:, 2]], axis=1)
+    d = sd_round_cone(q, (0, 0, ANKLE[2]), (0, 0, HIP[2]), R_ANKLE, R_HIP)
+    return d * (1 + (LEG_DEPTH - 1) * 0.5)
 
 
-def body_loft(p):
-    """身体主干：叠放的椭球，平滑融合。建网格时会沿 z 方向再模糊一下，抹掉层与层之间的细横纹。"""
-    body = np.full(len(p), 1e9)
-    for z0 in np.arange(0.18, 0.99, 0.018):
-        a, c, r = (float(v) for v in profile(z0))
-        if a < 0.01:
-            continue
-        h = 0.05
-        e = sd_ellipsoid(p, (0.0, c, z0), (a * 0.985, r * 0.985, h))
-        body = smin(body, e, 0.02)
-    return body
+def sd_foot(p, s):
+    q = p - mirror(FOOT_C, s)
+    f = sd_ellipsoid(q, (0, 0, 0), FOOT_R)
+    return f
 
 
-def parts(p, loft=None):
-    """各部位的距离（未合并），用来上色和分配骨骼权重。loft 可以传入预先算好（并模糊过）的身体主干。"""
+def parts(p, torso=None):
+    """各部位的距离（未合并），用来上色和分配骨骼权重。"""
     d = {}
-    body = body_loft(p) if loft is None else loft
-    # 下巴下面那条往里收的弧、尖尖的上唇（像鸟喙）
-    mp, _ = head_surface(0.0, MOUTH_Z + 0.010)
-    snout = sd_ellipsoid(p, mp + np.array([0, 0.010, 0.002]), (0.062, 0.012, 0.016))
-    body = smin(body, snout, 0.012)
-    # 眼眶：眼球后半圈鼓起来的皮，前面挖出眼球的位置，让眼球露出大半
-    for s in (1, -1):
-        c, look = eye_frame(s)
-        body = smin(body, sd_sphere(p, c - look * 0.022, EYE_R * 0.92), 0.012)
-        body = smax(body, -sd_sphere(p, c, EYE_R * 1.03), 0.004)
+    body = sd_torso(p) if torso is None else torso
+    # 两眼之间到嘴的一块微微隆起的“鼻梁”，嘴上方一个小小的尖（侧面看像鸟喙）
+    mz, _ = torso_surface(0.0, 0.888)
+    body = smin(body, sd_ellipsoid(p, mz + np.array([0, 0.018, 0]), (0.045, 0.020, 0.038)), 0.02)
+    # 嘴中间的小尖：从上唇往前下方伸出的一个小圆锥
+    bk, _ = torso_surface(0.0, MOUTH_Z + 0.010)
+    beak = sd_round_cone(p, bk + np.array([0, 0.006, 0.004]), bk + np.array([0, -0.009, -0.006]), 0.011, 0.0025)
+    body = smin(body, beak, 0.006)
+    # 眼睛是单独的眼球物体，嵌在头里只露出一小块球冠，皮肤不用挖
     d['body'] = body
-
     for s, tag in ((1, 'L'), (-1, 'R')):
         S, E, W_ = mirror(SHOULDER, s), mirror(ELBOW, s), mirror(WRIST, s)
         pa = arm_query(p, s)
         d[f'upperarm.{tag}'] = sd_round_cone(pa, S, E, R_SHOULDER, R_ELBOW)
         d[f'forearm.{tag}'] = sd_round_cone(pa, E, W_, R_ELBOW, R_WRIST)
         hand = sd_ellipsoid(pa, mirror(PALM_C, s), PALM_R)
-        hand = smin(hand, sd_capsule(pa, W_, mirror(PALM_C, s) + np.array([0, 0, 0.02]), 0.033), 0.012)
+        hand = smin(hand, sd_capsule(pa, W_, mirror(PALM_C, s), 0.032), 0.010)
         for a, b, c, r in FINGERS + [THUMB]:
-            f = smin(sd_capsule(pa, mirror(a, s), mirror(b, s), r), sd_round_cone(pa, mirror(b, s), mirror(c, s), r, r * 0.86), 0.004)
-            hand = smin(hand, f, 0.006)
+            f = smin(sd_capsule(pa, mirror(a, s), mirror(b, s), r), sd_round_cone(pa, mirror(b, s), mirror(c, s), r, r * 0.85), 0.004)
+            hand = smin(hand, f, 0.005)
         d[f'hand.{tag}'] = hand
-        d[f'leg.{tag}'] = sd_round_cone(p, mirror(HIP, s), mirror(ANKLE, s), R_HIP, R_ANKLE)
-        fl = foot_local(p, s)
-        foot = sd_ellipsoid(fl, (0, 0, 0), FOOT_R)
-        for dx, rt in TOES:
-            foot = smin(foot, sd_sphere(fl, (dx, -FOOT_R[1] * 0.86, rt * 0.92 - 0.002), rt), 0.006)
-        foot = smax(foot, -(fl[:, 2] + 0.028), 0.004)  # 脚底压平
+        d[f'leg.{tag}'] = sd_leg(p, s)
+        foot = sd_foot(p, s)
+        foot = smax(foot, -p[:, 2], 0.004)  # 脚底平
         d[f'foot.{tag}'] = foot
+        toes = np.full(len(p), 1e9)
+        for dx, rt in TOES:
+            c = mirror(FOOT_C, s) * np.array([1, 0, 0]) + np.array([dx * s, TOE_Y, TOE_Z])
+            toes = np.minimum(toes, sd_ellipsoid(p, c, (rt, rt * 1.05, rt * 0.9)))
+        d[f'toes.{tag}'] = toes
+    q = p * np.array([TAIL_SQUASH, 1, 1])
+    tail = np.full(len(p), 1e9)
+    for (c0, r0), (c1, r1) in zip(TAIL[:-1], TAIL[1:]):
+        tail = smin(tail, sd_round_cone(q, c0, c1, r0, r1), 0.02)
+    d['tail'] = tail / TAIL_SQUASH ** 0.5
     return d
 
 
 def combine(d):
-    """合成一整块皮：肩、腿根融合得软一些，手臂贴着身体的地方留一道折痕。"""
-    total = d['body']
+    """合成一整块皮。"""
+    total = smin(d['body'], d['tail'], 0.09)
     for tag in ('L', 'R'):
         arm = smin(d[f'upperarm.{tag}'], d[f'forearm.{tag}'], 0.02)
-        arm = smin(arm, d[f'hand.{tag}'], 0.012)
-        total = smin(total, arm, 0.012)
-        # 肩膀单独用大一点的融合半径
-        sgn = 1 if tag == 'L' else -1
-        sh = sd_sphere_np(arm_query(d['_p'], sgn), mirror(SHOULDER + np.array([-0.022, 0.0, 0.018]), sgn), R_SHOULDER * 0.92)
-        total = smin(total, sh, 0.05)
-        leg = smin(d[f'leg.{tag}'], d[f'foot.{tag}'], 0.015)
-        # 大腿外侧和肚子下沿融得软一些，裆下面的拱形保持清楚；屁股底部前后收圆
+        arm = smin(arm, d[f'hand.{tag}'], 0.010)
+        # 肩膀处和身体融得很软，往下（上臂内侧起）留一道清楚的折痕
         p_ = d['_p']
-        outer = np.clip((np.abs(p_[:, 0]) - 0.06) / 0.08, 0, 1)
-        fb = np.clip((np.abs(p_[:, 1] - HIP[1]) - 0.05) / 0.08, 0, 1)  # 大腿前后侧也融软，侧面不会像裙边
-        total = smin(total, leg, 0.018 + 0.03 * np.maximum(outer, fb))
+        k_arm = 0.008 + 0.034 * np.clip((p_[:, 2] - 0.60) / 0.08, 0, 1)
+        total = smin(total, arm, k_arm)
+        leg = smin(d[f'leg.{tag}'], d[f'foot.{tag}'], 0.03)
+        leg = smin(leg, d[f'toes.{tag}'], 0.004)
+        # 大腿外侧和肚子下沿融软，裆下面的拱形保持清楚
+        outer = np.clip((np.abs(p_[:, 0]) - 0.07) / 0.08, 0, 1)
+        total = smin(total, leg, 0.016 + 0.04 * outer)
     return total
 
 
-def sd_sphere_np(p, c, r):
-    return sd_sphere(p, c, r)
-
-
-def sdf(p, loft=None):
-    d = parts(p, loft)
+def sdf(p, torso=None):
+    d = parts(p, torso)
     d['_p'] = p
     return combine(d), d
 
 
-BOUNDS = np.array([[-0.54, 0.54], [-0.36, 0.36], [-0.005, 1.06]])
+BOUNDS = np.array([[-0.42, 0.42], [-0.32, 0.44], [-0.005, 1.03]])
+
+
+def volume(voxel):
+    """在规则网格上求整体 SDF。躯干的距离用距离变换算（远处也准），贴近表面处用解析式（亚体素精度）。"""
+    from scipy.ndimage import distance_transform_edt
+    b = BOUNDS
+    xs = np.arange(b[0, 0], b[0, 1] + voxel, voxel)
+    ys = np.arange(b[1, 0], b[1, 1] + voxel, voxel)
+    zs = np.arange(b[2, 0], b[2, 1] + voxel, voxel)
+    X, Y = np.meshgrid(xs, ys, indexing='ij')
+    inside = np.empty((len(xs), len(ys), len(zs)), bool)
+    near = np.empty((len(xs), len(ys), len(zs)), np.float32)
+    for k, z in enumerate(zs):
+        P = np.stack([X.ravel(), Y.ravel(), np.full(X.size, z)], axis=1)
+        inside[:, :, k] = torso_inside(P).reshape(X.shape)
+        near[:, :, k] = sd_torso(P).reshape(X.shape)
+    out = distance_transform_edt(~inside) * voxel
+    inn = distance_transform_edt(inside) * voxel
+    from scipy.ndimage import gaussian_filter
+    torso = gaussian_filter(np.where(inside, -inn, out).astype(np.float32), 1.0)
+    # 解析距离和距离变换对得上的地方（表面附近、融合区里）用解析值：没有体素台阶，融合处不会出波纹
+    # 两者对得上的地方（表面附近、融合区里）平滑地换成解析值；身体底部的圆顶收得很急，
+    # 那里解析距离不可靠，只在贴近表面时用。全部用连续权重，避免出现接缝。
+    wz = (np.clip((zs - (Z_BOT + 0.03)) / 0.07, 0, 1) * np.clip((Z_TOP - 0.02 - zs) / 0.03, 0, 1))[None, None, :]
+    agree = np.clip(1.5 - np.abs(near - torso) / (0.2 * np.abs(torso) + 2.0 * voxel), 0, 1)
+    surf = np.clip(2.0 - np.abs(torso) / voxel, 0, 1)
+    w = np.maximum(agree * wz, surf * agree)
+    torso = torso + w * (near - torso)
+    vol = np.empty_like(torso)
+    for k, z in enumerate(zs):
+        P = np.stack([X.ravel(), Y.ravel(), np.full(X.size, z)], axis=1)
+        d, _ = sdf(P, torso[:, :, k].ravel())
+        vol[:, :, k] = d.reshape(X.shape)
+    return xs, ys, zs, vol
