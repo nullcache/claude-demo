@@ -30,7 +30,7 @@ SKIN = '#DEB04E'       # 暖黄（哑光）
 BELLY = '#D3B988'      # 奶油色肚皮
 HAND = '#54452A'       # 深橄榄棕的手
 TOE = '#47361F'        # 深棕色脚趾
-MOUTH_LINE = '#55300F'
+MOUTH_LINE = '#774A1B'
 IRIS = '#8DB088'       # 灰绿虹膜
 IRIS_RIM = '#5E7F5A'
 PUPIL = '#050505'
@@ -112,6 +112,11 @@ def masks(ob):
     col = np.stack([belly, dark * (1 - toe), toe, np.ones_like(belly)], axis=1)
     attr = me.color_attributes.new('mask', 'FLOAT_COLOR', 'POINT')
     attr.data.foreach_set('color', col.astype(np.float32).ravel())
+    # 手臂和身体相贴的那道折缝：烘一层环境遮蔽（两边的距离都接近 0 的地方最暗）
+    arm = np.minimum.reduce([d[k] for k in d if k.startswith(('upperarm', 'forearm'))])
+    occ = np.exp(-(np.maximum(np.abs(arm), np.abs(d['body'])) / 0.011) ** 2) * (z < 0.64)
+    ao = me.color_attributes.new('crease', 'FLOAT_COLOR', 'POINT')
+    ao.data.foreach_set('color', np.repeat(occ[:, None], 4, axis=1).astype(np.float32).ravel())
     return d
 
 
@@ -151,6 +156,11 @@ def skin_material():
     c = mix(sep.outputs[0], srgb(SKIN), srgb(BELLY), -150, 150)
     c = mix(sep.outputs[1], c, srgb(HAND), 50, 100)
     c = mix(sep.outputs[2], c, srgb(TOE), 250, 50)
+    cr = node(nt, 'ShaderNodeAttribute', -600, 300, attribute_name='crease')
+    crm = node(nt, 'ShaderNodeMath', -350, 300, operation='MULTIPLY')
+    nt.links.new(cr.outputs['Fac'], crm.inputs[0])
+    crm.inputs[1].default_value = 0.45
+    c = mix(crm.outputs[0], c, (0.10, 0.045, 0.012, 1.0), 400, 50)
     nt.links.new(c, bs.inputs['Base Color'])
     # 粗糙度：灰色手脚更哑
     rough = node(nt, 'ShaderNodeMapRange', 250, -200)
@@ -229,14 +239,14 @@ def make_mouth_line():
     center = pts.mean(axis=0)
     cu = bpy.data.curves.new('MouthLine', 'CURVE')
     cu.dimensions = '3D'
-    cu.bevel_depth = 0.0021
+    cu.bevel_depth = 0.0029
     cu.bevel_resolution = 3
     sp = cu.splines.new('POLY')
     sp.points.add(len(pts) - 1)
     for i, p in enumerate(pts):
         sp.points[i].co = (*(p - center), 1.0)
         u = 2 * i / (len(pts) - 1) - 1
-        sp.points[i].radius = 0.35 + 0.65 * (1 - u * u) ** 0.5  # 中间粗、两头细
+        sp.points[i].radius = 0.10 + 0.90 * (1 - u * u) ** 0.8  # 中间粗，往两头逐渐变细消失
     ob = bpy.data.objects.new('MouthLine', cu)
     bpy.context.scene.collection.objects.link(ob)
     ob.location = center

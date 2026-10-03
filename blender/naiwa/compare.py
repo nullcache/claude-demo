@@ -17,7 +17,9 @@ import build  # noqa: E402
 
 REFS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'refs')
 FONT = os.environ.get('NAIWA_FONT', '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc')
-VIEWS = (('front', '正面', (0, -3.4, 0.55), 0), ('side', '侧面', (-3.4, 0, 0.55), -90), ('back', '背面', (0, 3.4, 0.55), 180))
+# 参考图接近正交投影（长焦远拍）：正面/背面略微俯视，侧面平视。用 200mm 镜头、8 米远拍，透视和参考一致
+VIEWS = (('front', '正面', (0, -8.0, 0.85), 0), ('side', '侧面', (-8.0, 0, 0.55), -90), ('back', '背面', (0, 8.0, 0.85), 180))
+LENS = 200
 
 
 def render_views(out, res=720, samples=32):
@@ -29,7 +31,7 @@ def render_views(out, res=720, samples=32):
     for name, _, loc, ang in VIEWS:
         for o in lights:
             o.matrix_world = Matrix.Rotation(math.radians(ang), 4, 'Z') @ base[o.name]
-        build.aim(cam, loc, (0, 0, 0.5), 85)
+        build.aim(cam, loc, (0, 0, 0.5), LENS)
         build.render(os.path.join(out, f'{name}.png'), (res, res), samples)
     for o in lights:
         o.matrix_world = base[o.name]
