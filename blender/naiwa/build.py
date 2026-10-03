@@ -30,7 +30,7 @@ SKIN = '#DEB04E'       # 暖黄（哑光）
 BELLY = '#D3B988'      # 奶油色肚皮
 HAND = '#54452A'       # 深橄榄棕的手
 TOE = '#47361F'        # 深棕色脚趾
-MOUTH_LINE = '#5E3D1F'
+MOUTH_LINE = '#55300F'
 IRIS = '#8DB088'       # 灰绿虹膜
 IRIS_RIM = '#5E7F5A'
 PUPIL = '#050505'
@@ -90,14 +90,13 @@ def masks(ob):
     d = shape.parts(P)
     x, y, z = P.T
     # 手：腕部往上有一小段渐变
-    rest = np.minimum.reduce([d['body'], d['tail']] + [d[k] for k in d if k.startswith(('upperarm', 'forearm', 'leg', 'foot'))])
-    hand = np.minimum.reduce([d[k] for k in d if k.startswith('hand')])
-    wrist_z = shape.WRIST[2] + 0.012
-    hand_c = 1 / (1 + np.exp(-(rest - hand) / 0.004))
-    fore = np.minimum.reduce([d[k] for k in d if k.startswith('forearm')])
-    on_fore = 1 / (1 + np.exp(-(np.minimum(d['body'], d['tail']) - fore) / 0.003))
-    grad = np.clip((wrist_z + 0.03 - z) / 0.03, 0, 1)
-    dark = np.maximum(hand_c, grad * grad * (3 - 2 * grad) * on_fore)
+    # 手：属于手臂/手的那部分皮肤，从手腕往上 3cm 柔和过渡到深色
+    armish = np.minimum.reduce([d[k] for k in d if k.startswith(('forearm', 'hand'))])
+    on_arm = 1 / (1 + np.exp(-(np.minimum(d['body'], d['tail']) - armish) / 0.003))
+    # 深色的上沿外侧略高、内侧略低（和参考图一样斜一点），过渡约 5cm
+    wrist_z = shape.WRIST[2] + 0.004 + 0.012 * np.clip((np.abs(x) - shape.WRIST[0]) / 0.04, -1, 1)
+    grad = np.clip((wrist_z + 0.032 - z) / 0.055, 0, 1)
+    dark = grad * grad * (3 - 2 * grad) * on_arm
     toes = np.minimum.reduce([d[k] for k in d if k.startswith('toes')])
     legs = np.minimum.reduce([d[k] for k in d if k.startswith(('leg', 'foot'))])
     toe = 1 / (1 + np.exp(-(legs - toes) / 0.0015))
@@ -230,19 +229,22 @@ def make_mouth_line():
     center = pts.mean(axis=0)
     cu = bpy.data.curves.new('MouthLine', 'CURVE')
     cu.dimensions = '3D'
-    cu.bevel_depth = 0.0018
+    cu.bevel_depth = 0.0021
     cu.bevel_resolution = 3
     sp = cu.splines.new('POLY')
     sp.points.add(len(pts) - 1)
     for i, p in enumerate(pts):
         sp.points[i].co = (*(p - center), 1.0)
+        u = 2 * i / (len(pts) - 1) - 1
+        sp.points[i].radius = 0.35 + 0.65 * (1 - u * u) ** 0.5  # 中间粗、两头细
     ob = bpy.data.objects.new('MouthLine', cu)
     bpy.context.scene.collection.objects.link(ob)
     ob.location = center
     m = bpy.data.materials.new('MouthLine')
     m.use_nodes = True
     m.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = srgb(MOUTH_LINE)
-    m.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 0.6
+    m.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 0.9
+    m.node_tree.nodes['Principled BSDF'].inputs['Specular IOR Level'].default_value = 0.1
     cu.materials.append(m)
     return ob
 
