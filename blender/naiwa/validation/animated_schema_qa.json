@@ -1,0 +1,136 @@
+{
+  "blender_version": "4.5.14 LTS",
+  "mesh": {
+    "Naiwa": {
+      "vertices": 106215,
+      "faces": 202906,
+      "boundary_edges": 0,
+      "wire_edges": 0,
+      "nonmanifold_edges": 0,
+      "isolated_vertices": 0
+    },
+    "Arm.L": {
+      "vertices": 24017,
+      "faces": 48026,
+      "boundary_edges": 0,
+      "wire_edges": 0,
+      "nonmanifold_edges": 0,
+      "isolated_vertices": 0
+    },
+    "Arm.R": {
+      "vertices": 24017,
+      "faces": 48025,
+      "boundary_edges": 0,
+      "wire_edges": 0,
+      "nonmanifold_edges": 0,
+      "isolated_vertices": 0
+    }
+  },
+  "weights": {
+    "Naiwa": {
+      "groups": [
+        "chest",
+        "foot.L",
+        "foot.R",
+        "head",
+        "hips",
+        "shin.L",
+        "shin.R",
+        "spine",
+        "tail.01",
+        "tail.02",
+        "thigh.L",
+        "thigh.R"
+      ],
+      "min_sum": 0.9998082928359509,
+      "max_sum": 1.0000000447034836
+    },
+    "Arm.L": {
+      "groups": [
+        "forearm.L",
+        "hand.L",
+        "upperarm.L"
+      ],
+      "min_sum": 0.9999113082885742,
+      "max_sum": 1.0000000298023224
+    },
+    "Arm.R": {
+      "groups": [
+        "forearm.R",
+        "hand.R",
+        "upperarm.R"
+      ],
+      "min_sum": 0.9999113082885742,
+      "max_sum": 1.0000000298023224
+    }
+  },
+  "actions": {
+    "Idle": [
+      1.0,
+      97.0
+    ],
+    "Laugh_Belly": [
+      1.0,
+      120.0
+    ]
+  },
+  "references": [
+    {
+      "name": "front.png",
+      "packed": true
+    },
+    {
+      "name": "laugh.jpg",
+      "packed": true
+    },
+    {
+      "name": "turn.png",
+      "packed": true
+    }
+  ],
+  "mouth_cleanup_distance": 2e-07,
+  "rig_bones": 19,
+  "body_shape_keys": [
+    "Basis",
+    "Laugh_Open"
+  ],
+  "body_drivers": 1,
+  "laugh48": {
+    "Naiwa": {
+      "bbox_min": [
+        -0.2860942780971527,
+        -0.32535508275032043,
+        -3.9405745155818295e-06
+      ],
+      "bbox_max": [
+        0.2860942780971527,
+        0.38958320021629333,
+        0.9560015201568604
+      ]
+    },
+    "Arm.L": {
+      "bbox_min": [
+        0.09042821079492569,
+        -0.2930368483066559,
+        0.36086782813072205
+      ],
+      "bbox_max": [
+        0.27601584792137146,
+        0.011083334684371948,
+        0.6914438009262085
+      ]
+    },
+    "Arm.R": {
+      "bbox_min": [
+        -0.27601584792137146,
+        -0.2930368483066559,
+        0.36086782813072205
+      ],
+      "bbox_max": [
+        -0.09042821079492569,
+        0.011083334684371948,
+        0.6914438009262085
+      ]
+    }
+  }
+}

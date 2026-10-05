@@ -16,7 +16,10 @@ from mathutils import Matrix  # noqa: E402
 import build  # noqa: E402
 
 REFS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'refs')
-FONT = os.environ.get('NAIWA_FONT', '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc')
+FONT = os.environ.get('NAIWA_FONT', next((p for p in (
+    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf') if os.path.exists(p)), ''))
 # 参考图接近正交投影（长焦远拍）：正面/背面略微俯视，侧面平视。用 200mm 镜头、8 米远拍，透视和参考一致
 VIEWS = (('front', '正面', (0, -8.0, 0.85), 0), ('side', '侧面', (-8.0, 0, 0.55), -90), ('back', '背面', (0, 8.0, 0.85), 180))
 LENS = 200
@@ -57,10 +60,9 @@ def model_mask(im):
 def sheet(out, H=560):
     turn = Image.open(os.path.join(REFS, 'turn.png')).convert('RGB')
     tm = np.asarray(Image.open(os.path.join(REFS, 'turn_mask.png'))) > 127
-    front = Image.open(os.path.join(REFS, 'front.png')).convert('RGB')
-    fm = np.asarray(Image.open(os.path.join(REFS, 'front_mask.png'))) > 127
     refs = {
-        'front': crop_to(front, fm, H),
+        # 此轮统一采用同一张三视图，不混入另一帧不同受光的单独正面。
+        'front': crop_to(turn.crop((420, 0, 860, turn.height)), tm[:, 420:860], H),
         'side': crop_to(turn.crop((0, 0, 420, turn.height)), tm[:, :420], H),
         'back': crop_to(turn.crop((860, 0, 1280, turn.height)), tm[:, 860:], H),
     }

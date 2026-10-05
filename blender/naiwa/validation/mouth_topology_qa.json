@@ -1,0 +1,84 @@
+{
+  "merge_distance": 2e-07,
+  "merged_vertices": 264,
+  "before": {
+    "vertices": 106479,
+    "faces": 203171,
+    "poses": {
+      "0": {
+        "zero_area_faces": 157,
+        "inverted_skin_faces": 2,
+        "skin_faces": 7014
+      },
+      "0.2": {
+        "zero_area_faces": 93,
+        "inverted_skin_faces": 1,
+        "skin_faces": 7014
+      },
+      "0.5": {
+        "zero_area_faces": 93,
+        "inverted_skin_faces": 0,
+        "skin_faces": 7014
+      },
+      "0.8": {
+        "zero_area_faces": 93,
+        "inverted_skin_faces": 0,
+        "skin_faces": 7014
+      },
+      "1": {
+        "zero_area_faces": 118,
+        "inverted_skin_faces": 0,
+        "skin_faces": 7014
+      }
+    },
+    "edges": {
+      "boundary": 0,
+      "nonmanifold": 0
+    },
+    "keys": [
+      "Basis",
+      "Laugh_Open"
+    ],
+    "drivers": 1
+  },
+  "after": {
+    "vertices": 106215,
+    "faces": 202906,
+    "poses": {
+      "0": {
+        "zero_area_faces": 0,
+        "inverted_skin_faces": 0,
+        "skin_faces": 6832
+      },
+      "0.2": {
+        "zero_area_faces": 0,
+        "inverted_skin_faces": 0,
+        "skin_faces": 6832
+      },
+      "0.5": {
+        "zero_area_faces": 0,
+        "inverted_skin_faces": 0,
+        "skin_faces": 6832
+      },
+      "0.8": {
+        "zero_area_faces": 0,
+        "inverted_skin_faces": 0,
+        "skin_faces": 6832
+      },
+      "1": {
+        "zero_area_faces": 0,
+        "inverted_skin_faces": 0,
+        "skin_faces": 6832
+      }
+    },
+    "edges": {
+      "boundary": 0,
+      "nonmanifold": 0
+    },
+    "keys": [
+      "Basis",
+      "Laugh_Open"
+    ],
+    "drivers": 1
+  }
+}

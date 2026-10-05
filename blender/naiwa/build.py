@@ -26,11 +26,11 @@ def srgb(h):
     return tuple((x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4) for x in c) + (1.0,)
 
 
-SKIN = '#DEB04E'       # 暖黄（哑光）
-BELLY = '#D3B988'      # 奶油色肚皮
+SKIN = '#DEAD42'       # 暖黄（哑光）
+BELLY = '#D8C7A2'      # 三视图中更浅的暖奶油色肚皮
 HAND = '#54452A'       # 深橄榄棕的手
 TOE = '#47361F'        # 深棕色脚趾
-MOUTH_LINE = '#774A1B'
+MOUTH_LINE = '#4A3A1C'
 IRIS = '#8DB088'       # 灰绿虹膜
 IRIS_RIM = '#5E7F5A'
 PUPIL = '#050505'
@@ -103,7 +103,7 @@ def masks(ob):
     # 肚皮：从正面投影的椭圆，只在身体正面，边缘柔和
     a, yc, ry = shape.profile(z)
     e = (x / 0.272) ** 2 + ((z - 0.447) / 0.196) ** 2
-    belly = np.clip((1.10 - e) / 0.30, 0, 1)
+    belly = np.clip((1.15 - e) / 0.45, 0, 1)
     belly = belly * belly * (3 - 2 * belly)
     front = np.clip((yc - y) / (0.25 * np.maximum(ry, 1e-3)), 0, 1)
     armness = np.minimum.reduce([d[k] for k in d if k.startswith(('upperarm', 'forearm', 'hand'))])
@@ -171,7 +171,7 @@ def skin_material():
     bs.inputs['Subsurface Weight'].default_value = 0.5
     bs.inputs['Subsurface Radius'].default_value = (1.0, 0.45, 0.15)
     bs.inputs['Subsurface Scale'].default_value = 0.016
-    bs.inputs['Specular IOR Level'].default_value = 0.35
+    bs.inputs['Specular IOR Level'].default_value = 0.22
     # 很细的皮肤颗粒
     tc = node(nt, 'ShaderNodeTexCoord', -600, -400)
     nz = node(nt, 'ShaderNodeTexNoise', -400, -400)
@@ -203,7 +203,7 @@ def eye_material():
     nt.links.new(sub.outputs[0], ln.inputs[0])
     sub2 = node(nt, 'ShaderNodeVectorMath', -500, -100, operation='SUBTRACT')
     nt.links.new(sub.outputs[0], sub2.inputs[0])
-    sub2.inputs[1].default_value = (-0.08, -0.10, 0.0)  # 瞳孔中心比圆盘中心低 0.2R、往鼻梁一侧 0.16R
+    sub2.inputs[1].default_value = (-0.06, -0.06, 0.0)  # 补偿眼盘朝外的投影，使黑瞳轻微内收
     ln2 = node(nt, 'ShaderNodeVectorMath', -300, -100, operation='LENGTH')
     nt.links.new(sub2.outputs[0], ln2.inputs[0])
     iris = node(nt, 'ShaderNodeValToRGB', -100, 150)
@@ -226,10 +226,9 @@ def eye_material():
     nt.links.new(iris.outputs['Color'], mx.inputs['A'])
     mx.inputs['B'].default_value = srgb(PUPIL)
     nt.links.new(mx.outputs['Result'], bs.inputs['Base Color'])
-    bs.inputs['Roughness'].default_value = 0.45
-    bs.inputs['Specular IOR Level'].default_value = 0.3
-    bs.inputs['Coat Weight'].default_value = 0.08
-    bs.inputs['Coat Roughness'].default_value = 0.3
+    bs.inputs['Roughness'].default_value = 0.72
+    bs.inputs['Specular IOR Level'].default_value = 0.06
+    bs.inputs['Coat Weight'].default_value = 0.0
     return m
 
 
@@ -275,7 +274,7 @@ def make_eyes(mat, scale=1.0):
         rr, tt = np.meshgrid(rs[1:], th, indexing='ij')
         rr = np.concatenate([[0.0], rr.ravel()])
         tt = np.concatenate([[0.0], tt.ravel()])
-        q = pt + np.outer(rr * np.cos(tt), u) + np.outer(rr * np.sin(tt), v)
+        q = pt + np.outer(rr * np.cos(tt) * shape.EYE_ASPECT, u) + np.outer(rr * np.sin(tt), v)
         # 沿视线方向投到皮肤上
         t = np.zeros(len(q))
         for _ in range(6):
@@ -333,7 +332,7 @@ def studio(height=1.0):
     wn = w.node_tree
     bg = wn.nodes['Background']
     bg.inputs[0].default_value = srgb('#ffffff')
-    bg.inputs[1].default_value = 0.22
+    bg.inputs[1].default_value = 0.75
     # 相机直接看到的背景是浅灰白（和参考图一样），照明用的环境光弱一些
     bg2 = wn.nodes.new('ShaderNodeBackground')
     bg2.inputs[0].default_value = srgb('#ECECEC')
@@ -364,9 +363,9 @@ def studio(height=1.0):
         o.rotation_euler = (Vector((0, 0, 0.55 * height)) - o.location).to_track_quat('-Z', 'Y').to_euler()
         return o
 
-    area('Key', (-0.8, -2.3, 3.2), 125 * height ** 2, 2.6 * height)
-    area('Fill', (2.6, -2.4, 1.2), 10 * height ** 2, 4.0 * height)
-    area('Rim', (0.8, 3.0, 2.6), 40 * height ** 2, 3.0 * height)
+    area('Key', (-0.8, -2.3, 3.2), 65 * height ** 2, 2.6 * height)
+    area('Fill', (2.6, -2.4, 1.2), 45 * height ** 2, 4.0 * height)
+    area('Rim', (0.8, 3.0, 2.6), 35 * height ** 2, 3.0 * height)
     cam = bpy.data.objects.new('Camera', bpy.data.cameras.new('Camera'))
     sc.collection.objects.link(cam)
     sc.camera = cam

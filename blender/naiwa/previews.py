@@ -1,6 +1,6 @@
 """把 naiwa.blend 里的每个动作渲成预览视频，外加 360° 转台，最后拼成一条带标题的 naiwa_showcase.mp4。
 
-    python blender/naiwa/previews.py blender/naiwa/naiwa.blend OUTDIR [--res 540] [--samples 12] [--only Laugh,Wave]
+    python blender/naiwa/previews.py blender/naiwa/naiwa_rigged.blend OUTDIR [--res 540] [--samples 12] [--only Laugh_Belly]
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ LABELS = {
     'Idle': '待机 Idle',
     'Wave': '挥手 Wave',
     'Laugh': '捧腹大笑 Laugh',
+    'Laugh_Belly': '捧腹大笑 Laugh_Belly',
     'Walk': '摇摆走 Walk',
     'Jump': '开心跳 Jump',
     'Think': '托腮 Think',
@@ -51,8 +52,11 @@ def encode(frames_dir, mp4, fps=24):
                     '-crf', '20', mp4], check=True)
 
 
-FONT = os.environ.get('NAIWA_FONT', '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc')
-ORDER = ['Turntable', 'Idle', 'Wave', 'Laugh', 'Walk', 'Jump', 'Think']
+FONT = os.environ.get('NAIWA_FONT', next((p for p in (
+    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf') if os.path.exists(p)), ''))
+ORDER = ['Turntable', 'Idle', 'Wave', 'Laugh', 'Laugh_Belly', 'Walk', 'Jump', 'Think']
 
 
 def showcase(out):

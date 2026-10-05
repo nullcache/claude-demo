@@ -10,7 +10,9 @@
 from __future__ import annotations
 
 import numpy as np
+import sys
 from scipy.interpolate import PchipInterpolator
+from arm_curve import smooth_arm
 
 # ── 身体 + 头：正面半宽 a(z) ───────────────────────────────────────────────────
 FRONT = np.array([
@@ -225,13 +227,13 @@ def mirror(v, s):
 
 # ── 手臂（左臂 +X，右臂镜像）：从身体两侧垂下，上臂和身体融成一块 ─────────────────────
 # 手臂的中轴是一条往外鼓的弧线（肩 → 上臂中段 → 肘 → 腕），手臂贴着身体挂着（内侧刚好碰到身体，折缝又窄又深）
-SHOULDER, ARM_MID, ELBOW, WRIST = (np.array([0.216, -0.005, 0.640]), np.array([0.265, 0.000, 0.580]),
-                                   np.array([0.300, 0.010, 0.500]), np.array([0.321, -0.015, 0.415]))
+SHOULDER, ARM_MID, ELBOW, WRIST = (np.array([0.228, -0.005, 0.640]), np.array([0.274, 0.000, 0.580]),
+                                   np.array([0.309, 0.010, 0.500]), np.array([0.330, -0.015, 0.415]))
 # 半径按参考图每个高度的（外缘 − 折缝）/ 2 定：上臂最粗，前臂往手腕逐渐变细
-R_SHOULDER, R_MID, R_ELBOW, R_WRIST = 0.048, 0.047, 0.044, 0.036
-ARM_DEPTH = 1.35  # 前后半径 / 左右半径
+R_SHOULDER, R_MID, R_ELBOW, R_WRIST = 0.048, 0.050, 0.050, 0.042
+ARM_DEPTH = 1.41  # 增大左右半径并内移，外缘/侧面厚度不变，修掉过宽的白缝
 # 手：深橄榄色的小手，掌心朝身体，三根短手指往下、指尖微微往外张，拇指在前
-PALM_C, PALM_R = np.array([0.330, -0.030, 0.374]), np.array([0.033, 0.034, 0.034])
+PALM_C, PALM_R = np.array([0.341, -0.030, 0.374]), np.array([0.033, 0.034, 0.034])
 FINGERS = [
     # (根部, 中段, 指尖, 半径)：往下再往身体一侧勾
     (np.array([0.342, -0.054, 0.356]), np.array([0.342, -0.056, 0.334]), np.array([0.326, -0.054, 0.322]), 0.0125),
@@ -239,6 +241,10 @@ FINGERS = [
     (np.array([0.342, -0.006, 0.354]), np.array([0.342, -0.004, 0.332]), np.array([0.326, -0.004, 0.322]), 0.0125),
 ]
 THUMB = (np.array([0.318, -0.060, 0.390]), np.array([0.310, -0.072, 0.376]), np.array([0.303, -0.074, 0.366]), 0.0120)
+# 三视图的手外缘更宽；保留指尖内勾的相对形状，整只手平移。
+FINGERS = [(a + (0.011, 0, 0), b + (0.011, 0, 0), c + (0.011, 0, 0), r)
+           for a, b, c, r in FINGERS]
+THUMB = tuple(v + (0.011, 0, 0) for v in THUMB[:3]) + (THUMB[3],)
 
 # ── 腿：粗短的柱子（横截面前后略长），脚就是柱子底部往前多一点 ─────────────────────────
 HIP, ANKLE = np.array([0.140, 0.010, 0.230]), np.array([0.140, 0.004, 0.050])
@@ -254,19 +260,20 @@ TAIL = [  # (中心, 半径)：水平往后伸的锥形尾巴，尖端钝圆、�
     (np.array([0.0, 0.150, 0.225]), 0.095),
     (np.array([0.0, 0.370, 0.250]), 0.017),
 ]
-TAIL_SQUASH = (1.28, 1.15)  # 左右、上下方向各压扁一点
+TAIL_SQUASH = (1.16, 1.15)  # 尾根的背视截面稍宽，保留侧面尾长和高度
 # 尾巴下沿：从尾尖一条长长的斜线一直连到脚后跟（像恐龙尾巴，尾根和大腿连成一体）
-TAIL_FIN = ((np.array([0.0, 0.358, 0.240]), 0.016), (np.array([0.0, 0.180, 0.176]), 0.026))
+TAIL_FIN = ((np.array([0.0, 0.358, 0.240]), 0.016), (np.array([0.0, 0.180, 0.194]), 0.026))
 
 # ── 脸 ─────────────────────────────────────────────────────────────────────────
 # 眼睛：贴在头顶前侧的圆盘（大球露出一小块球冠），虹膜灰绿、大黑瞳
-EYE_X, EYE_Z = 0.071, 0.923
-EYE_DISC = 0.038      # 露出来的圆盘半径（含外圈深色环）
-EYE_BULGE = 0.0110    # 圆盘鼓出皮肤的高度（侧面也看得见）
+EYE_X, EYE_Z = 0.073, 0.930
+EYE_DISC = 0.036      # 三视图中的绿眼圈，正面高约 0.072H
+EYE_ASPECT = 1.12     # 单独修正正面可见宽度，不再把眼圈高度放大
+EYE_BULGE = 0.0045    # 浅球冠贴脸，避免侧面鼓出成玻璃眼球
 EYE_R = (EYE_DISC ** 2 + EYE_BULGE ** 2) / (2 * EYE_BULGE)  # 眼球半径
-PUPIL = 0.0205        # 瞳孔半径（在圆盘上量）
-MOUTH_Z = 0.864
-MOUTH_HALF = 0.036
+PUPIL = 0.0180        # 正面可见黑瞳宽约 0.030H
+MOUTH_Z = 0.874
+MOUTH_HALF = 0.032
 
 
 def torso_surface(x, z):
@@ -355,19 +362,16 @@ def parts(p, torso=None):
     # “嘴套”：两眼之间往下到嘴的一块往前凸的区域，两边脸颊往后收
     # （往下一直延伸过嘴线，嘴下面的脸不会突然往里收、出现一道阴影）
     mz, _ = torso_surface(0.0, 0.884)
-    body = smin(body, sd_ellipsoid(p, mz + np.array([0, 0.013, 0]), (0.048, 0.024, 0.048)), 0.022)
+    body = smin(body, sd_ellipsoid(p, mz + np.array([0, 0.020, -0.003]), (0.048, 0.018, 0.032)), 0.008)
     # 眼睛是单独的眼球物体，嵌在头里只露出一小块球冠，皮肤不用挖
     d['body'] = body
     for s, tag in ((1, 'L'), (-1, 'R')):
         S, M, E, W_ = mirror(SHOULDER, s), mirror(ARM_MID, s), mirror(ELBOW, s), mirror(WRIST, s)
         pa = arm_query(p, s)
-        # 手臂横截面是前后方向长的椭圆（贴着身体侧面）：正面看不变，侧面看更粗
-        sq = lambda v: np.array([v[0], v[1] / ARM_DEPTH, v[2]])
-        qa = pa * np.array([1.0, 1.0 / ARM_DEPTH, 1.0])
-        k_d = 1.0 / ARM_DEPTH ** 0.35
-        d[f'upperarm.{tag}'] = smin(sd_round_cone(qa, sq(S), sq(M), R_SHOULDER, R_MID),
-                                    sd_round_cone(qa, sq(M), sq(E), R_MID, R_ELBOW), 0.004) / k_d
-        d[f'forearm.{tag}'] = sd_round_cone(qa, sq(E), sq(W_), R_ELBOW, R_WRIST) / k_d
+        # 连续曲线放样保留量得的肩/肘/腕位置，消除直线锥台的肘部折角。
+        arm = smooth_arm(p, s, sys.modules[__name__])
+        d[f'upperarm.{tag}'] = arm['upperarm']
+        d[f'forearm.{tag}'] = arm['forearm']
         hand = sd_ellipsoid(pa, mirror(PALM_C, s), PALM_R)
         hand = smin(hand, sd_capsule(pa, W_, mirror(PALM_C, s), 0.032), 0.010)
         for a, b, c, r in FINGERS + [THUMB]:
@@ -399,25 +403,29 @@ def parts(p, torso=None):
     return d
 
 
-def combine(d):
+def combine(d, include_arms=True):
     """合成一整块皮。"""
     # 尾巴上沿顺着后背平滑长出来，下沿轮廓清楚一点（背面看是一颗往下指的水滴）
     p_ = d['_p']
     k_tail = 0.024 + 0.06 * np.clip((p_[:, 2] - 0.22) / 0.12, 0, 1)
     total = smin(d['body'], d['tail'], k_tail)
     for tag in ('L', 'R'):
-        arm = smin(d[f'upperarm.{tag}'], d[f'forearm.{tag}'], 0.005)
+        arm = np.minimum(d[f'upperarm.{tag}'], d[f'forearm.{tag}'])
         arm = smin(arm, d[f'hand.{tag}'], 0.010)
         # 肩头和身体融得很软（圆圆的一包），往下整条手臂和身体之间留一道深折缝
         p_ = d['_p']
         k_arm = 0.005 + 0.07 * np.clip((p_[:, 2] - 0.60) / 0.10, 0, 1) ** 1.5
-        total = smin(total, arm, k_arm)
+        if include_arms:
+            total = smin(total, arm, k_arm)
+        # 动画版手臂为独立闭合组件，臂根与原躯干相交。
+        # 不把臂根烘入躯干，否则抬手会露出停在原位的肩帽。
         leg = smin(d[f'leg.{tag}'], d[f'foot.{tag}'], 0.03)
         leg = smin(leg, d[f'toes.{tag}'], 0.004)
         # 大腿外侧和肚子下沿稍微融软一点（肚子像个球垂在腿上，留一点折痕），裆下面的拱形保持清楚
         outer = np.clip((np.abs(p_[:, 0]) - 0.07) / 0.08, 0, 1)
         total = smin(total, leg, 0.014 + 0.026 * outer)
-    return total
+    # 在脚底统一截平，避免胶囊腿/脚趾穿过采样体积下界而留下开口。
+    return smax(total, -p_[:, 2], 0.0015)
 
 
 def sdf(p, torso=None):
@@ -429,7 +437,7 @@ def sdf(p, torso=None):
 BOUNDS = np.array([[-0.42, 0.42], [-0.32, 0.44], [-0.005, 1.03]])
 
 
-def volume(voxel):
+def volume(voxel, components=False):
     """在规则网格上求整体 SDF。躯干的距离用距离变换算（远处也准），贴近表面处用解析式（亚体素精度）。"""
     from scipy.ndimage import distance_transform_edt
     b = BOUNDS
@@ -455,9 +463,20 @@ def volume(voxel):
     surf = np.clip(2.0 - np.abs(torso) / voxel, 0, 1)
     w = np.maximum(agree * wz, surf * agree)
     torso = torso + w * (near - torso)
-    vol = np.empty_like(torso)
+    del inside, near, out, inn, agree, surf, w, wz
+    vol = ({name: np.empty_like(torso) for name in ('body', 'arm.L', 'arm.R')}
+           if components else np.empty_like(torso))
     for k, z in enumerate(zs):
         P = np.stack([X.ravel(), Y.ravel(), np.full(X.size, z)], axis=1)
-        d, _ = sdf(P, torso[:, :, k].ravel())
-        vol[:, :, k] = d.reshape(X.shape)
+        if components:
+            d = parts(P, torso[:, :, k].ravel())
+            d['_p'] = P
+            vol['body'][:, :, k] = combine(d, include_arms=False).reshape(X.shape)
+            for tag in ('L', 'R'):
+                arm = np.minimum(d[f'upperarm.{tag}'], d[f'forearm.{tag}'])
+                arm = smin(arm, d[f'hand.{tag}'], 0.010)
+                vol[f'arm.{tag}'][:, :, k] = arm.reshape(X.shape)
+        else:
+            d, _ = sdf(P, torso[:, :, k].ravel())
+            vol[:, :, k] = d.reshape(X.shape)
     return xs, ys, zs, vol

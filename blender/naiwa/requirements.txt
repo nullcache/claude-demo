@@ -1,8 +1,8 @@
-# Blender 作为 Python 模块运行（不用装 Blender 本体也能生成 .blend）
+# 需要 Python 3.11；Blender 作为 Python 模块运行
 bpy==4.5.14
 numpy==1.26.4        # bpy 4.5 需要 numpy<2
 scipy>=1.11
 scikit-image==0.24.0 # 和 numpy 1.26 兼容的版本
 pillow               # silhouette.py / compare.py
 # 只有重新抠参考图剪影（refs/*_mask.png）时才需要：
-# rembg[cpu]
+# pip install "rembg[cpu]"  # 可选，不影响生成模型

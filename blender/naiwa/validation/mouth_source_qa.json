@@ -1,0 +1,37 @@
+{
+  "mesh": {
+    "vertices": 45078,
+    "faces": 83896,
+    "boundary_edges": 0,
+    "wire_edges": 0,
+    "nonmanifold_edges": 0,
+    "isolated_vertices": 0
+  },
+  "merged_vertices": 2,
+  "poses": {
+    "0": {
+      "zero_area_faces": 0,
+      "inverted_front_faces": 0
+    },
+    "0.2": {
+      "zero_area_faces": 0,
+      "inverted_front_faces": 0
+    },
+    "0.5": {
+      "zero_area_faces": 0,
+      "inverted_front_faces": 0
+    },
+    "0.8": {
+      "zero_area_faces": 0,
+      "inverted_front_faces": 0
+    },
+    "1": {
+      "zero_area_faces": 0,
+      "inverted_front_faces": 0
+    }
+  },
+  "attributes": [
+    "mask",
+    "crease"
+  ]
+}
