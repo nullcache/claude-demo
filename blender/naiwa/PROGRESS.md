@@ -13,6 +13,14 @@
 
 - [动画 Blender 工程](naiwa_rigged.blend)，躯干与双臂约 30 万面，默认待机第 1 帧。
 - [捧腹大笑预览](preview/laugh.png)。
+- [5 秒动作预览](preview/Laugh_Belly.mp4)。常态转大笑时闭眼线提前接入，四档过渡近景检查已通过。
 - `validation/` 包含动画拓扑、权重、打包参考图及口周清理／源代码复建检查报告。
 
 参考三视图标注 AI 生成，不同视角的受光与细节并不完全一致。剩余差异主要是腹斑色温、下腹阴影，以及参考侧视的少量偏转；本轮不宣称逐点一比一。
+
+## 接手说明
+
+1. 使用 Blender 4.5 LTS 打开 `naiwa.blend` 查看常态，打开 `naiwa_rigged.blend` 播放动作。工程已内嵌参考图，不依赖本机路径。
+2. 在动画工程中选择 `Naiwa_SafeRig`，Action Editor 切换 `Idle` / `Laugh_Belly`。手动表情先解除动作关联，再调骨架自定义属性 `laugh`。手指没有独立控制器。
+3. 脚本入口与 Python 3.11 安装、重新生成命令见 [README.md](README.md)。静态入口 `make.py`，动画入口 `make.py --rig`；原 `rig.py` / `actions.py` 保留，但未接入新流程。
+4. 后续精修继续对照 `refs/turn.png`。优先处理手指内勾、腹斑色温与受光；动画双臂独立于躯干，常态肩部接合与静态工程有少量差异。不要混用单独正面帧的尺度去修改三视图轮廓。

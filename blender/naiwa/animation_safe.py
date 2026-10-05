@@ -148,7 +148,10 @@ def smile_eyes(eyes,rig,surface):
                 rest.append((xx,surface(xx,zz)+.007,zz))
             if i:faces.append((2*i-2,2*i,2*i+1,2*i-1))
         lid=_keyed('Smile eyelid.'+('L' if side>0 else 'R'),rest,opened,faces,lidmat)
-        drive(lid.data.shape_keys.key_blocks['Laugh_Open'],rig,'min(1,max(0,(laugh-.15)*1.5))')
+        # Bring the eyelid above the skin before the shrinking iris disappears.
+        # Its rest position is recessed by 7 mm, so a slow linear fade leaves
+        # the face briefly blank between the neutral and laughing expressions.
+        drive(lid.data.shape_keys.key_blocks['Laugh_Open'],rig,'min(1,max(0,laugh*13))')
         parent_bone(lid,rig,'head');all_lids.append(lid)
     return all_lids
 
